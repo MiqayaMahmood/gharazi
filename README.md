@@ -1003,3 +1003,8 @@ Security and launch hardening:
 - Stronger automated alerts and ops runbooks
 - Consumer frontend polish and conversion optimization
 - Optional internal AI-assisted ops tooling
+
+## git commands
+git init
+git add .
+git commit -m "Initial Homegate beta version"
