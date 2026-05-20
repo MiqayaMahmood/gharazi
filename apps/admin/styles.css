@@ -1,0 +1,32 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, Arial, sans-serif; color: #1f2937; background: #f8fafc; display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+aside { background: #0f172a; color: white; padding: 20px; }
+h1 { font-size: 18px; margin: 0 0 20px; }
+nav { display: grid; gap: 6px; }
+nav a { color: #cbd5e1; text-decoration: none; padding: 9px 10px; border-radius: 6px; }
+nav a:hover { background: #1e293b; color: white; }
+main { min-width: 0; }
+header { display: grid; grid-template-columns: minmax(220px, 340px) 1fr; gap: 12px; padding: 16px 20px; background: white; border-bottom: 1px solid #e5e7eb; position: sticky; top: 0; z-index: 1; }
+label { display: block; font-size: 12px; color: #64748b; margin-bottom: 4px; }
+input, textarea, select { width: 100%; border: 1px solid #cbd5e1; border-radius: 6px; padding: 9px 10px; background: white; }
+button { border: 0; background: #2563eb; color: white; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+button.secondary { background: #475569; }
+button.danger { background: #dc2626; }
+#app { padding: 20px; }
+.toolbar { display: flex; gap: 8px; margin: 12px 0; align-items: end; flex-wrap: wrap; }
+.grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; }
+.metric { font-size: 28px; font-weight: 700; margin-top: 6px; }
+table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+th { background: #f1f5f9; font-size: 12px; color: #475569; }
+pre { white-space: pre-wrap; max-width: 420px; margin: 0; }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.error { color: #b91c1c; background: #fee2e2; padding: 10px; border-radius: 6px; }
+.muted { color: #64748b; }
+@media (max-width: 900px) {
+  body { grid-template-columns: 1fr; }
+  aside { position: static; }
+  header { grid-template-columns: 1fr; }
+  .grid { grid-template-columns: 1fr 1fr; }
+}

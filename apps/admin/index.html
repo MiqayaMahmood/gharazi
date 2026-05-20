@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gharazi Admin</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <aside>
+        <h1>Gharazi Admin</h1>
+      <nav>
+        <a href="#/">Overview</a>
+        <a href="#/reports">Reports</a>
+        <a href="#/verifications">Verifications</a>
+        <a href="#/listings">Listings</a>
+        <a href="#/projects">Projects</a>
+        <a href="#/users">Users</a>
+        <a href="#/promotions">Promotions</a>
+        <a href="#/subscriptions">Subscriptions</a>
+        <a href="#/payments">Payments</a>
+        <a href="#/submissions">Submissions</a>
+        <a href="#/risk-flags">Risk Flags</a>
+        <a href="#/search-ops">Search Ops</a>
+        <a href="#/queues">Queues</a>
+        <a href="#/audit-logs">Audit Logs</a>
+        <a href="#/cms/pages">CMS Pages</a>
+        <a href="#/cms/blog-posts">Blog Posts</a>
+        <a href="#/analytics">Analytics</a>
+      </nav>
+    </aside>
+    <main>
+      <header>
+        <div>
+          <label for="apiBase">API</label>
+          <input id="apiBase" value="http://localhost:3001" />
+        </div>
+        <div>
+          <label for="token">Bearer token</label>
+          <input id="token" placeholder="Paste admin JWT" />
+        </div>
+      </header>
+      <section id="app"></section>
+    </main>
+    <script src="./main.js"></script>
+  </body>
+</html>

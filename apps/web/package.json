@@ -1,0 +1,10 @@
+{
+  "name": "@Gharazi/web",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  }
+}
