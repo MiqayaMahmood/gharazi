@@ -1060,3 +1060,22 @@ Common provider checks:
 - Resend: health reports configured/disabled and never sends an automatic test email.
 
 Incident checklist: identify the request ID and affected entity; check system health and recent events; confirm DB/Redis readiness; inspect worker heartbeat and failed jobs; check the relevant provider; retry only idempotent operations; resolve the system event after recovery; and preserve logs before redeployment.
+
+## Company / Professional dashboard
+
+Authenticated users can open `/dashboard/professional`. Existing `agent`, `developer`, and `admin` roles are treated as professional-eligible. An Individual/owner account sees a controlled upgrade CTA and becomes eligible after creating its own `ProfessionalProfile`; existing `Developer` records and project workflows remain unchanged.
+
+Professional APIs are authenticated and always scoped to the current user:
+
+- `GET /professional/profile/me`
+- `POST /professional/profile`
+- `PATCH /professional/profile`
+- `POST /professional/profile/request-verification`
+- `GET /professional/limits/me`
+- `GET /professional/dashboard/summary`
+
+The dashboard shows profile completion, verification, current subscription, informational listing/project quota, owned inventory, monthly views/inquiries/messages/favorites, recent received leads, and active promotions. Project capability is shown for the `developer` role or `developer_builder` business type; quotas are informational and do not alter existing posting rules.
+
+Admins manage business profiles at `/admin/professionals` through `GET /admin/professionals`, `GET /admin/professionals/:id`, and approve/reject actions. Verification requests reuse the existing `verification_requests` table with type `company`; profile approval synchronizes pending requests and notifies the account owner.
+
+Deploy the `professional_profiles` migration with `npm run prisma:deploy`. Public agency pages, team members/permissions, lead assignment, CRM pipelines, hard quota enforcement, document KYC, and a dedicated professional-logo upload endpoint are intentionally deferred. The setup form accepts an existing hosted logo URL until a generic profile-media S3 flow is introduced.

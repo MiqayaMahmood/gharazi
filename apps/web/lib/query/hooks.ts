@@ -5,6 +5,7 @@ import { getListingOwnerSummary, getListingViewerContext, getMyListing, getProje
 import { getPopularListings, getPopularProjects } from '@/lib/api/analytics';
 import { getChatMessages, getListingContact, listChats, listFavorites, listInquiries, listMyListings, listMyProjects, listNotifications, listSavedSearches } from '@/lib/api/engagement';
 import { listAmenities, listAreas, listCities, listPropertyTypes, listPurposes } from '@/lib/api/reference';
+import { getProfessionalProfile, getProfessionalSummary } from '@/lib/api/professional';
 import {
   getAdminAnalyticsSummary,
   getAdminDataIntegrity,
@@ -17,6 +18,7 @@ import {
   listAdminListings,
   listAdminPayments,
   listAdminProjects,
+  listAdminProfessionals,
   listAdminPromotions,
   listAdminReports,
   listAdminRiskFlags,
@@ -178,6 +180,9 @@ export function useAdminOverview() {
   return useQuery({ queryKey: ['admin-overview'], queryFn: getAdminOverview, retry: false });
 }
 
+export function useProfessionalProfile() { return useQuery({ queryKey: ['professional-profile'], queryFn: getProfessionalProfile, retry: false }); }
+export function useProfessionalSummary() { return useQuery({ queryKey: ['professional-summary'], queryFn: getProfessionalSummary, retry: false }); }
+
 export function useAdminSystemHealth() { return useQuery({ queryKey: ['admin-system-health'], queryFn: getAdminSystemHealth, retry: false, refetchInterval: 30000 }); }
 export function useAdminSystemEvents() { return useQuery({ queryKey: ['admin-system-events'], queryFn: listAdminSystemEvents, retry: false }); }
 
@@ -192,6 +197,8 @@ export function useAdminListings(status?: string) {
 export function useAdminProjects(status?: string) {
   return useQuery({ queryKey: ['admin-projects', status], queryFn: () => listAdminProjects(status), retry: false });
 }
+
+export function useAdminProfessionals(status?: string) { return useQuery({ queryKey: ['admin-professionals', status], queryFn: () => listAdminProfessionals(status), retry: false }); }
 
 export function useAdminReports() {
   return useQuery({ queryKey: ['admin-reports'], queryFn: () => listAdminReports(), retry: false });

@@ -48,6 +48,7 @@ model User {
   savedSearches                SavedSearch[]
   sessions                     Session[]
   profile                      UserProfile?
+  professionalProfile          ProfessionalProfile?
   roles                        UserRole[]
   subscriptions                UserSubscription[]
   systemEvents                 SystemEvent[]
@@ -112,6 +113,33 @@ model UserProfile {
   @@map("user_profiles")
 }
 
+model ProfessionalProfile {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String   @unique @map("user_id") @db.Uuid
+  businessName       String   @map("business_name") @db.VarChar(160)
+  businessType       String   @map("business_type") @db.VarChar(64)
+  contactPersonName  String   @map("contact_person_name") @db.VarChar(120)
+  phone              String   @db.VarChar(32)
+  whatsapp           String?  @db.VarChar(32)
+  email              String?  @db.VarChar(255)
+  websiteUrl         String?  @map("website_url") @db.VarChar(500)
+  logoUrl            String?  @map("logo_url") @db.VarChar(1000)
+  cityId             String?  @map("city_id") @db.Uuid
+  addressLine        String?  @map("address_line") @db.VarChar(500)
+  description        String?  @db.VarChar(1000)
+  verificationStatus String   @default("unverified") @map("verification_status") @db.VarChar(32)
+  rejectionReason    String?  @map("rejection_reason") @db.VarChar(1000)
+  packageCode        String?  @map("package_code") @db.VarChar(64)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  city               City?    @relation(fields: [cityId], references: [id])
+
+  @@index([businessType, verificationStatus])
+  @@index([cityId])
+  @@map("professional_profiles")
+}
+
 model Session {
   id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String    @map("user_id") @db.Uuid
@@ -128,18 +156,19 @@ model Session {
 }
 
 model City {
-  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name          String        @db.VarChar(120)
-  slug          String        @unique @db.VarChar(140)
-  province      String?       @db.VarChar(120)
-  isActive      Boolean       @default(true) @map("is_active")
-  sortOrder     Int           @default(0) @map("sort_order")
-  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  areas         Area[]
-  listings      Listing[]
-  projects      Project[]
-  savedSearches SavedSearch[]
+  id                   String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                 String                @db.VarChar(120)
+  slug                 String                @unique @db.VarChar(140)
+  province             String?               @db.VarChar(120)
+  isActive             Boolean               @default(true) @map("is_active")
+  sortOrder            Int                   @default(0) @map("sort_order")
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  areas                Area[]
+  listings             Listing[]
+  projects             Project[]
+  savedSearches        SavedSearch[]
+  professionalProfiles ProfessionalProfile[]
 
   @@index([isActive, sortOrder])
   @@map("cities")

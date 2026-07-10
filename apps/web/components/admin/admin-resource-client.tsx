@@ -15,6 +15,7 @@ import {
   repairAdminDataIntegrity,
   reviewAdminListing,
   reviewAdminProject,
+  reviewAdminProfessional,
   reviewAdminReport,
   reviewAdminVerification,
   runAdminSearchAction,
@@ -30,6 +31,7 @@ import {
   useAdminListings,
   useAdminPayments,
   useAdminProjects,
+  useAdminProfessionals,
   useAdminPromotions,
   useAdminReports,
   useAdminRiskFlags,
@@ -46,6 +48,7 @@ type Resource =
   | 'users'
   | 'listings'
   | 'projects'
+  | 'professionals'
   | 'reports'
   | 'verification'
   | 'submissions'
@@ -67,6 +70,7 @@ const titles: Record<Resource, [string, string]> = {
   users: ['Users', 'Approve, block, role-manage, and create admin users.'],
   listings: ['Listings Review', 'Review listing quality, verification status, and pending inventory.'],
   projects: ['Projects Review', 'Review developer projects and transparency signals.'],
+  professionals: ['Professionals', 'Review business profiles, verification, inventory, and package status.'],
   reports: ['Reports', 'Resolve and dismiss marketplace reports.'],
   verification: ['Verification Requests', 'Approve or reject trust and identity requests.'],
   submissions: ['Submissions', 'Handle feedback, contact, and support requests.'],
@@ -89,10 +93,11 @@ function text(value: unknown): string {
   return String(value);
 }
 
-function useResource(resource: Resource): QueryResult {
+function useResource(resource: Resource, professionalStatus?: string): QueryResult {
   const users = useAdminUsers();
   const listings = useAdminListings();
   const projects = useAdminProjects();
+  const professionals = useAdminProfessionals(professionalStatus);
   const reports = useAdminReports();
   const verification = useAdminVerificationRequests();
   const submissions = useAdminSubmissions();
@@ -111,6 +116,7 @@ function useResource(resource: Resource): QueryResult {
     users,
     listings,
     projects,
+    professionals,
     reports,
     verification,
     submissions,
@@ -152,6 +158,17 @@ function columnsFor(resource: Resource) {
     { key: 'city.name', label: 'City', render: (row: Record<string, unknown>) => text(readPath(row, 'city.name')) },
     { key: 'verificationStatus', label: 'Trust', render: (row: Record<string, unknown>) => <StatusBadge value={row.verificationStatus} /> },
     status,
+  ];
+  if (resource === 'professionals') return [
+    { key: 'businessName', label: 'Business' },
+    { key: 'businessType', label: 'Type' },
+    { key: 'user.profile.fullName', label: 'Contact', render: (row: Record<string, unknown>) => text(row.contactPersonName ?? readPath(row, 'user.profile.fullName')) },
+    { key: 'city.name', label: 'City', render: (row: Record<string, unknown>) => text(readPath(row, 'city.name')) },
+    { key: 'user._count.ownedListings', label: 'Listings', render: (row: Record<string, unknown>) => text(readPath(row, 'user._count.ownedListings')) },
+    { key: 'user.ownedDevelopers._count.projects', label: 'Projects', render: (row: Record<string, unknown>) => text(readPath(row, 'user.ownedDevelopers._count.projects') ?? 0) },
+    { key: 'user.subscriptions', label: 'Package', render: (row: Record<string, unknown>) => text(readPath(row, 'user.subscriptions.0.packageCode') ?? readPath(row, 'user.subscriptions.0.plan.name') ?? 'Free / Basic') },
+    { key: 'verificationStatus', label: 'Verification', render: (row: Record<string, unknown>) => <StatusBadge value={row.verificationStatus} /> },
+    updated,
   ];
   if (resource === 'submissions') return [
     { key: 'submissionType', label: 'Type', render: (row: Record<string, unknown>) => <StatusBadge value={row.submissionType} /> },
@@ -221,6 +238,7 @@ function useActions(resource: Resource) {
       if (resource === 'users') return action === 'block' ? setAdminUserStatus(id, 'block') : action === 'role-admin' ? addAdminUserRole(id, 'admin') : setAdminUserStatus(id, 'approve');
       if (resource === 'listings') return reviewAdminListing(id, action === 'reject' ? 'reject' : 'approve', action === 'reject' ? 'Rejected from admin dashboard' : undefined);
       if (resource === 'projects') return reviewAdminProject(id, action === 'reject' ? 'reject' : 'approve', action === 'reject' ? 'Rejected from admin dashboard' : undefined);
+      if (resource === 'professionals') return reviewAdminProfessional(id, action.startsWith('reject:') ? 'reject' : 'approve', action.startsWith('reject:') ? action.slice(7) : undefined);
       if (resource === 'reports') return reviewAdminReport(id, action === 'dismiss' ? 'dismiss' : 'resolve', action);
       if (resource === 'verification') return reviewAdminVerification(id, action === 'reject' ? 'reject' : 'approve', action === 'reject' ? 'Rejected from admin dashboard' : undefined);
       if (resource === 'submissions') return action === 'assign' ? assignAdminSubmission(id, '', 'Assignment pending') : updateAdminSubmissionStatus(id, action);
@@ -241,7 +259,8 @@ function useActions(resource: Resource) {
 }
 
 export function AdminResourceClient({ resource }: { resource: Resource }) {
-  const query = useResource(resource);
+  const [professionalStatus, setProfessionalStatus] = useState('');
+  const query = useResource(resource, professionalStatus);
   const mutation = useActions(resource);
   const [adminForm, setAdminForm] = useState({ fullName: '', email: '', phoneNumber: '', password: '' });
   const createAdmin = useMutation({
@@ -280,6 +299,7 @@ export function AdminResourceClient({ resource }: { resource: Resource }) {
           <Button onClick={() => createAdmin.mutate(adminForm)} disabled={createAdmin.isPending}>Create admin</Button>
         </Card>
       ) : null}
+      {resource === 'professionals' ? <div className="mb-4"><select className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold" value={professionalStatus} onChange={(event) => setProfessionalStatus(event.target.value)}><option value="">All verification states</option><option value="unverified">Unverified</option><option value="pending">Pending</option><option value="verified">Verified</option><option value="rejected">Rejected</option></select></div> : null}
       {createAdmin.isError ? <div className="mb-4"><ErrorAlert error={createAdmin.error} /></div> : null}
       {mutation.isError ? <div className="mb-4"><ErrorAlert error={mutation.error} /></div> : null}
       {resource === 'data-integrity' ? (
@@ -296,6 +316,7 @@ export function AdminResourceClient({ resource }: { resource: Resource }) {
         rows={rows}
         actions={(row) => {
           if (resource === 'users') return <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => mutation.mutate({ row, action: 'approve' })}>Approve</Button><Button variant="ghost" onClick={() => mutation.mutate({ row, action: 'block' })}>Block</Button><Button variant="ghost" onClick={() => mutation.mutate({ row, action: 'role-admin' })}>Admin role</Button></div>;
+          if (resource === 'professionals') return <div className="flex gap-2"><Button variant="secondary" onClick={() => mutation.mutate({ row, action: 'approve' })}>Approve</Button><Button variant="ghost" onClick={() => { const reason = window.prompt('Rejection reason'); if (reason?.trim()) mutation.mutate({ row, action: `reject:${reason.trim()}` }); }}>Reject</Button></div>;
           if (resource === 'listings' || resource === 'projects' || resource === 'verification') return <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => mutation.mutate({ row, action: 'approve' })}>Approve</Button><Button variant="ghost" onClick={() => mutation.mutate({ row, action: 'reject' })}>Reject</Button></div>;
           if (resource === 'reports') return <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => mutation.mutate({ row, action: 'resolve' })}>Resolve</Button><Button variant="ghost" onClick={() => mutation.mutate({ row, action: 'dismiss' })}>Dismiss</Button></div>;
           if (resource === 'submissions') return <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => mutation.mutate({ row, action: 'in_progress' })}>In progress</Button><Button variant="ghost" onClick={() => mutation.mutate({ row, action: 'resolved' })}>Resolve</Button></div>;

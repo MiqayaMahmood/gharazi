@@ -65,6 +65,7 @@ export function DashboardOverviewClient() {
           <Button asChild href="/help" variant="secondary">Read account guidance</Button>
           <Button asChild href="/dashboard/profile" variant="secondary">Update profile</Button>
           <Button asChild href="/advertise">View packages</Button>
+          <Button asChild href="/dashboard/professional">Professional dashboard</Button>
         </div>
       </Card>
       <div className="grid gap-4 lg:grid-cols-2">

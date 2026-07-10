@@ -18,7 +18,7 @@ const sections = [
   },
   {
     title: 'Company / Professional users',
-    body: 'Choose Company / Professional if you are an agent, agency, developer, builder, or property business. Current listing and project tools remain available while advanced company profiles, subscriptions, and verification workflows are expanded.',
+    body: 'Choose Company / Professional if you are an agent, agency, developer, builder, dealer, marketer, or property business. Set up your business profile from the Professional Dashboard, then request verification. Professional accounts can review inventory, leads, performance, promotions, and package status; team CRM features remain a later phase.',
   },
   {
     title: 'Benefits for agents and developers',

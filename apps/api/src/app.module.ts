@@ -38,6 +38,7 @@ import { SubmissionsModule } from './modules/submissions/submissions.module';
 import { MediaModule } from './modules/media/media.module';
 import { NewsletterModule } from './modules/newsletter/newsletter.module';
 import { SystemEventsModule } from './modules/system-events/system-events.module';
+import { ProfessionalModule } from './modules/professional/professional.module';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
 
@@ -58,6 +59,7 @@ import { ApiExceptionFilter } from './common/filters/api-exception.filter';
     }),
     DatabaseModule,
     SystemEventsModule,
+    ProfessionalModule,
     RedisModule,
     QueueModule,
     ElasticsearchModule,

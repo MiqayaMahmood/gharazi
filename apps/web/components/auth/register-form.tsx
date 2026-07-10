@@ -62,7 +62,7 @@ export function RegisterForm() {
             />
           </div>
           <p className="text-xs text-muted">
-            Professional company, agency, developer, subscription, and verification tools are being expanded in the next phase.
+            Create a business profile, request verification, manage inventory and leads, and view package and performance summaries.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">

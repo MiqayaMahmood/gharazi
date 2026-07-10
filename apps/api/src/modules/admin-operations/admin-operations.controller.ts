@@ -50,6 +50,10 @@ export class AdminOperationsController {
   @Get('subscriptions') subscriptions(@Query('status') status?: string) { return this.admin.subscriptions({ status }); }
   @Get('system-events') systemEvents(@Query('limit') limit?: string) { return this.admin.systemEventsList(Number(limit ?? 100)); }
   @Post('system-events/:id/resolve') resolveSystemEvent(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) { return this.admin.resolveSystemEvent(user.id, id); }
+  @Get('professionals') professionals(@Query('status') status?: string) { return this.admin.professionals(status); }
+  @Get('professionals/:id') professional(@Param('id') id: string) { return this.admin.professionalProfile(id); }
+  @Post('professionals/:id/approve') approveProfessional(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) { return this.admin.reviewProfessional(user.id, id, 'verified'); }
+  @Post('professionals/:id/reject') rejectProfessional(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: RejectActionDto) { return this.admin.reviewProfessional(user.id, id, 'rejected', dto.reason); }
   @Get('cms/pages') cmsPages() { return this.admin.cmsPages(); }
   @Get('cms/blog-posts') blogPosts() { return this.admin.blogPosts(); }
   @Get('users') users() { return this.admin.users(); }

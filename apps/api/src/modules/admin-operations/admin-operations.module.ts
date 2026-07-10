@@ -5,11 +5,12 @@ import { RiskModule } from '../risk/risk.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { PromotionsModule } from '../promotions/promotions.module';
+import { ProfessionalModule } from '../professional/professional.module';
 import { AdminOperationsController } from './admin-operations.controller';
 import { AdminOperationsService } from './admin-operations.service';
 
 @Module({
-  imports: [AuditModule, NotificationsModule, RiskModule, AnalyticsModule, PaymentsModule, PromotionsModule],
+  imports: [AuditModule, NotificationsModule, RiskModule, AnalyticsModule, PaymentsModule, PromotionsModule, ProfessionalModule],
   controllers: [AdminOperationsController],
   providers: [AdminOperationsService],
 })

@@ -19,6 +19,7 @@ export const adminNav: Array<{ label: string; href: string; icon: AdminIconName 
   { label: 'Users', href: '/admin/users', icon: 'users' },
   { label: 'Listings', href: '/admin/listings', icon: 'home' },
   { label: 'Projects', href: '/admin/projects', icon: 'dashboard' },
+  { label: 'Professionals', href: '/admin/professionals', icon: 'users' },
   { label: 'Reports', href: '/admin/reports', icon: 'warning' },
   { label: 'Verification', href: '/admin/verification-requests', icon: 'shield' },
   { label: 'Submissions', href: '/admin/submissions', icon: 'message' },

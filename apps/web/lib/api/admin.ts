@@ -135,6 +135,9 @@ export async function listAdminPayments() {
   return normalizeList(await apiRequest<AdminListResponse>('/admin/payments'));
 }
 
+export async function listAdminProfessionals(status?: string) { return normalizeList(await apiRequest<AdminListResponse>(`/admin/professionals${toQueryString({ status })}`)); }
+export async function reviewAdminProfessional(id: string, decision: 'approve' | 'reject', reason?: string) { return apiRequest<AdminRecord>(`/admin/professionals/${id}/${decision}`, { method: 'POST', body: JSON.stringify({ reason }) }); }
+
 export async function reconcileAdminPayment(id: string) {
   return apiRequest<AdminRecord>(`/admin/payments/${id}/reconcile`, { method: 'POST' });
 }

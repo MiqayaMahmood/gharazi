@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet } from '@/components/ui/sheet';
 import { AdminIcon } from '@/components/admin/admin-icons';
 import { logout } from '@/lib/api/auth';
-import { isAdmin } from '@/lib/auth/roles';
+import { isAdmin, userRoleCodes } from '@/lib/auth/roles';
 import { useChats, useCurrentUser, useFavorites, useNotifications } from '@/lib/query/hooks';
 import { useCompareStore, useUiStore } from '@/stores/ui-store';
 
@@ -40,6 +40,7 @@ export function PublicHeader() {
   const unreadNotifications = notifications.data?.filter((item) => !item.readAt).length ?? 0;
   const unreadChats = chats.data?.filter((item) => item.unread).length ?? 0;
   const admin = isAdmin(user);
+  const professional = userRoleCodes(user).some((role) => ['agent', 'developer', 'admin'].includes(role));
   const signOut = useMutation({
     mutationFn: logout,
     onSuccess: async () => {
@@ -65,6 +66,7 @@ export function PublicHeader() {
   const accountLinks = (
     <>
       <Link className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold hover:bg-emerald-50" href="/dashboard"><AdminIcon name="dashboard" className="h-4 w-4" />My Dashboard</Link>
+      <Link className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold hover:bg-emerald-50" href="/dashboard/professional"><AdminIcon name="users" className="h-4 w-4" />{professional ? 'Professional Dashboard' : 'Become a Professional'}</Link>
       {admin ? <Link className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold hover:bg-emerald-50" href="/admin"><AdminIcon name="shield" className="h-4 w-4" />Admin Dashboard</Link> : null}
       <Link className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold hover:bg-emerald-50" href="/dashboard/profile"><AdminIcon name="user" className="h-4 w-4" />Profile</Link>
       <Link className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold hover:bg-emerald-50" href="/favorites"><AdminIcon name="heart" className="h-4 w-4" />Saved {favorites.data?.length ? <Badge>{favorites.data.length}</Badge> : null}</Link>
@@ -111,6 +113,7 @@ export function PublicHeader() {
               {admin ? <Button href="/admin" asChild variant="secondary">Admin Dashboard</Button> : null}
               <Button href="/dashboard/profile" asChild variant="secondary">Profile</Button>
               <Button href="/dashboard" asChild variant="secondary">My Dashboard</Button>
+              <Button href="/dashboard/professional" asChild variant="secondary">{professional ? 'Professional Dashboard' : 'Become a Professional'}</Button>
               <Button onClick={() => signOut.mutate()} variant="ghost">Logout</Button>
             </>
           ) : (

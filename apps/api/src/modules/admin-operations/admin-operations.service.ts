@@ -15,6 +15,7 @@ import { RollupDto } from './dto/rollup.dto';
 import { PaymentsService } from '../payments/payments.service';
 import { PromotionsService } from '../promotions/promotions.service';
 import { SystemEventsService } from '../system-events/system-events.service';
+import { ProfessionalService } from '../professional/professional.service';
 import { AdminRoleDto, CreateAdminUserDto } from './dto/admin-users.dto';
 import { ListingContactUpdatesQueryDto, UpdateListingContactDto } from './dto/listing-contact-update.dto';
 
@@ -31,6 +32,7 @@ export class AdminOperationsService {
     private readonly paymentsService: PaymentsService,
     private readonly promotionsService: PromotionsService,
     private readonly systemEvents: SystemEventsService,
+    private readonly professional: ProfessionalService,
   ) {}
 
   async overview() {
@@ -457,6 +459,9 @@ export class AdminOperationsService {
 
   systemEventsList(limit?: number) { return this.systemEvents.recent(limit); }
   async resolveSystemEvent(actorUserId: string, id: string) { const event = await this.systemEvents.resolve(id); await this.audit.record({ actorUserId, action: 'system_event.resolve', entityType: 'system_event', entityId: id }); return event; }
+  professionals(status?: string) { return this.professional.listAdmin(status); }
+  professionalProfile(id: string) { return this.professional.adminGet(id); }
+  async reviewProfessional(actorUserId: string, id: string, status: 'verified' | 'rejected', reason?: string) { const result = await this.professional.review(id, actorUserId, status, reason); await this.audit.record({ actorUserId, action: `professional.${status}`, entityType: 'professional_profile', entityId: id, metadataJson: { reason } }); return result; }
 
   private async missingIndexDocuments(alias: 'listings' | 'projects', entities: Array<{ id: string; publicId: string }>) {
     const index = this.elasticsearch.alias(alias);
