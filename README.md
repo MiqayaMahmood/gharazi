@@ -119,7 +119,7 @@ Web frontend:
 npm --prefix apps/web run dev
 ```
 
-The Next.js app lives in `apps/web` and explicitly runs on `http://localhost:3000` in local development. Set `NEXT_PUBLIC_API_BASE_URL=http://localhost:3001` in `apps/web/.env.local` when running the API locally.
+The Next.js app lives in `apps/web` and explicitly runs on `http://localhost:3000` in local development. Set `NEXT_PUBLIC_API_URL=http://localhost:3001` in `apps/web/.env.local` when running the API locally.
 
 Local development URLs:
 
@@ -145,14 +145,14 @@ npm --prefix apps/web run dev
 For the web app, create `apps/web/.env.local` when needed:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
+NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_ENABLE_MOCK_FALLBACK=false
 ```
 
 Troubleshooting local ports:
 
 - If port `3000` is already in use, stop the existing process or run the web app on another port and add that origin to `CORS_ORIGINS`.
-- If API CORS fails, verify the API is running on `http://localhost:3001`, verify `NEXT_PUBLIC_API_BASE_URL=http://localhost:3001`, and verify `CORS_ORIGINS` includes the web origin.
+- If API CORS fails, verify the API is running on `http://localhost:3001`, verify `NEXT_PUBLIC_API_URL=http://localhost:3001`, and verify `CORS_ORIGINS` includes the web origin.
 
 Production-like frontend mode:
 
@@ -448,7 +448,7 @@ Docker Compose includes an OpenTelemetry Collector. Prometheus-format metrics ar
 ## Public Beta Launch Checklist
 
 - For Railway API and worker services, set `DATABASE_URL=<Supabase Postgres URL>` and, only if Prisma migrations require it, `DIRECT_URL=<optional direct URL>`.
-- For Vercel web, do not set `DATABASE_URL` or any Supabase service role key. Web only needs `NEXT_PUBLIC_API_BASE_URL=<Railway API URL>` for API access.
+- For Vercel web, do not set `DATABASE_URL` or any Supabase service role key. Web only needs `NEXT_PUBLIC_API_URL=<Railway API URL>` for API access.
 - Set `JWT_SECRET`, Redis, Elasticsearch, and public web/API URLs for the target environment.
 - Set `NEXT_PUBLIC_ENABLE_MOCK_FALLBACK=false` for production-like and beta testing.
 - Run `npm install`, `npm run prisma:generate`, and `npm run prisma:deploy`.
@@ -552,7 +552,7 @@ Additional Sprint 16 environment variables:
 
 ```env
 APP_PUBLIC_URL=http://localhost:3000
-NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
+NEXT_PUBLIC_API_URL=http://localhost:3001
 RESEND_API_KEY=
 EMAIL_FROM=Gharazi <no-reply@Gharazi.pk>
 AWS_REGION=us-east-1
