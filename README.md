@@ -1018,3 +1018,45 @@ git commit -m "Initial Homegate beta version"
 git remote add origin https://github.com/MiqayaMahmood/gharazi.git
 git branch -M main
 git push -u origin main
+
+## Stripe Checkout deployment and testing
+
+Stripe monetization uses hosted Checkout Sessions. Configure the API/Railway service with `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CURRENCY`, `STRIPE_SUCCESS_URL`, `STRIPE_CANCEL_URL`, and the `STRIPE_PRICE_*` values documented in `.env.example`. The secret and webhook keys must never be configured as `NEXT_PUBLIC_*` Vercel variables. The publishable key is optional because the browser redirects to the session URL returned by the API.
+
+Apply Prisma migrations before enabling Checkout (`npm run prisma:deploy`). In Stripe, register `POST /payments/webhook/stripe` and subscribe to `checkout.session.completed`, `checkout.session.expired`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, and `invoice.payment_failed`.
+
+For test-mode local webhooks:
+
+```sh
+stripe listen --forward-to localhost:3001/payments/webhook/stripe
+```
+
+Copy the CLI `whsec_...` value into `STRIPE_WEBHOOK_SECRET`. Checkout creates a pending transaction only. Benefits are provisioned after a verified webhook; repeated deliveries are guarded by unique Stripe identifiers and the unique promotion payment transaction link. Admins can inspect `/admin/payments`, `/admin/promotions`, `/admin/subscriptions`, and `/admin/advertising`, reconcile paid transactions, and call `POST /admin/promotions/expire` as the manual expiry repair path.
+
+## Production monitoring and incident response
+
+API and worker logs are emitted as structured JSON with service, context, level, timestamp, action, safe error summary, and applicable request/job/entity identifiers. API requests accept or generate `x-request-id`, return it as a response header, and include it in error bodies. Do not place credentials, tokens, message bodies, or connection URLs in log metadata.
+
+Health surfaces:
+
+- `GET /health/live`: lightweight process liveness only.
+- `GET /health/ready`: PostgreSQL and Redis readiness, plus a non-critical Elasticsearch signal.
+- `GET /health/system`: admin/moderator-only provider, worker heartbeat, and queue health details.
+- `/admin/system-health`: auto-refreshing status cards for API, worker, database, Redis, Elasticsearch, Stripe, S3, Resend, WordPress, and BullMQ.
+- `/admin/system-events`: persistent recent server/provider events with resolution workflow.
+
+Run `npm run prisma:deploy` before deployment to create `system_events`. The worker writes a Redis heartbeat every 30 seconds; the API reports the worker degraded after two minutes without a fresh heartbeat. Failed queue totals remain visible even when the worker is offline.
+
+Optional error/telemetry configuration uses `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `OTEL_ENABLED`, and `OTEL_EXPORTER_OTLP_ENDPOINT`. Missing Sentry DSNs never block startup. DSN variables reserve the integration boundary; event transport requires adding the Sentry SDK in a later rollout. OpenTelemetry is active only when explicitly enabled.
+
+Railway incident workflow: filter JSON logs by `requestId`, `action`, `entityId`, or `jobId`; check `/health/system`; verify the API and worker services have matching Redis/database configuration; then inspect failed BullMQ jobs. Vercel incidents should be correlated using the request reference shown by frontend API errors and the matching Railway `requestId`.
+
+Common provider checks:
+
+- Stripe: confirm webhook signing secret and endpoint events, then search for `stripe.webhook.signature_failed`, `stripe.payment.failed`, or slow webhook actions.
+- Elasticsearch: confirm `ELASTICSEARCH_URL`, aliases, document counts, and `SEARCH_DB_FALLBACK_ENABLED`; provider outages should degrade rather than break marketplace search.
+- S3: verify bucket name, region, IAM `HeadBucket`/upload access, CORS, and public/CloudFront URL. Health uses `HeadBucket` and never uploads a probe object.
+- WordPress: verify `WP_API_BASE` exposes the configured REST categories endpoint within the three-second health timeout.
+- Resend: health reports configured/disabled and never sends an automatic test email.
+
+Incident checklist: identify the request ID and affected entity; check system health and recent events; confirm DB/Redis readiness; inspect worker heartbeat and failed jobs; check the relevant provider; retry only idempotent operations; resolve the system event after recovery; and preserve logs before redeployment.

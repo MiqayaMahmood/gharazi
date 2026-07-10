@@ -14,6 +14,8 @@ import { useCurrentUser } from '@/lib/query/hooks';
 
 export const adminNav: Array<{ label: string; href: string; icon: AdminIconName }> = [
   { label: 'Overview', href: '/admin', icon: 'overview' },
+  { label: 'System Health', href: '/admin/system-health', icon: 'shield' },
+  { label: 'System Events', href: '/admin/system-events', icon: 'warning' },
   { label: 'Users', href: '/admin/users', icon: 'users' },
   { label: 'Listings', href: '/admin/listings', icon: 'home' },
   { label: 'Projects', href: '/admin/projects', icon: 'dashboard' },
@@ -21,6 +23,7 @@ export const adminNav: Array<{ label: string; href: string; icon: AdminIconName 
   { label: 'Verification', href: '/admin/verification-requests', icon: 'shield' },
   { label: 'Submissions', href: '/admin/submissions', icon: 'message' },
   { label: 'Promotions', href: '/admin/promotions', icon: 'chart' },
+  { label: 'Advertising', href: '/admin/advertising', icon: 'chart' },
   { label: 'Subscriptions', href: '/admin/subscriptions', icon: 'money' },
   { label: 'Payments', href: '/admin/payments', icon: 'money' },
   { label: 'Analytics', href: '/admin/analytics', icon: 'chart' },

@@ -52,7 +52,7 @@ export class PromotionsService {
   async cancel(userId: string, id: string) {
     const promotion = await this.assertOwner(userId, id);
     const updated = await this.prisma.promotion.update({ where: { id }, data: { status: 'canceled' } });
-    await this.applyFeatured(promotion.entityType, promotion.entityId, false);
+    await this.recomputeEntityFlags(promotion.entityType, promotion.entityId);
     await this.audit.record({ actorUserId: userId, action: 'promotion.cancel', entityType: 'promotion', entityId: id });
     return updated;
   }
@@ -71,10 +71,23 @@ export class PromotionsService {
     const expired = await this.prisma.promotion.findMany({ where: { status: 'active', endsAt: { lte: new Date() } } });
     for (const promotion of expired) {
       await this.prisma.promotion.update({ where: { id: promotion.id }, data: { status: 'ended' } });
-      await this.applyFeatured(promotion.entityType, promotion.entityId, false);
+      await this.recomputeEntityFlags(promotion.entityType, promotion.entityId);
       await this.notifications.create({ userId: promotion.purchasedByUserId, notificationType: 'promotion_ended', title: 'Promotion ended', payloadJson: { promotionId: promotion.id }, queueDelivery: true });
     }
     return { ended: expired.length };
+  }
+
+  private async recomputeEntityFlags(entityType: string, entityId: string) {
+    const active = await this.prisma.promotion.findMany({ where: { entityType, entityId, status: 'active', endsAt: { gt: new Date() } } });
+    const isFeatured = active.some((item) => item.isFeatured || item.promotionType.includes('featured') || item.promotionType === 'listing_super_hot');
+    const isHot = active.some((item) => item.isHot || item.promotionType === 'listing_hot' || item.promotionType === 'listing_super_hot');
+    if (entityType === 'listing') {
+      const listing = await this.prisma.listing.update({ where: { id: entityId }, data: { isFeatured, isHot } });
+      if (listing.status === 'active') await this.indexing.indexListing(listing.id, listing.publicId);
+    } else if (entityType === 'project') {
+      const project = await this.prisma.project.update({ where: { id: entityId }, data: { isFeatured } });
+      if (project.status === 'active') await this.indexing.indexProject(project.id, project.publicId);
+    }
   }
 
   private async assertOwner(userId: string, id: string) {

@@ -43,6 +43,10 @@ export async function getAdminOverview() {
   return apiRequest<AdminOverview>('/admin/overview');
 }
 
+export async function getAdminSystemHealth() { return apiRequest<AdminRecord>('/health/system'); }
+export async function listAdminSystemEvents() { return normalizeList(await apiRequest<AdminListResponse>('/admin/system-events')); }
+export async function resolveAdminSystemEvent(id: string) { return apiRequest<AdminRecord>(`/admin/system-events/${id}/resolve`, { method: 'POST' }); }
+
 export async function getAdminAnalyticsSummary(range = 'current_month') {
   return apiRequest<AdminRecord>(`/admin/analytics/summary${toQueryString({ range })}`);
 }

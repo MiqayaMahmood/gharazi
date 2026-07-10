@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AdvertisingDisclaimer } from '@/components/legal/disclaimers';
 import { advertisingFaqs, advertisingPackages, audienceLabels, sponsoredPlacements, type AdvertisingAudience, type AdvertisingPackage } from '@/lib/advertising/packages';
+import { CheckoutButton } from '@/components/payments/checkout-button';
 
 export const metadata: Metadata = {
   title: 'Advertise Property on Gharazi Pakistan | Real Estate Ads & Packages',
@@ -81,6 +82,10 @@ export default function AdvertisePage() {
               <p className="mt-3 text-xs text-muted">Creative: {placement.creativeSize}</p>
               <p className="mt-1 text-xs text-muted">Availability: {placement.availability}</p>
               <Button className="mt-4 w-full" asChild href="#advertising-inquiry" variant="secondary">Inquire</Button>
+              {placement.id === 'homepage-middle' ? <CheckoutButton payload={{ packageCode: 'homepage_banner', entityType: 'banner' }}>Buy Now</CheckoutButton> : null}
+              {placement.id === 'search-inline' ? <CheckoutButton payload={{ packageCode: 'search_inline_ad', entityType: 'banner' }}>Buy Now</CheckoutButton> : null}
+              {placement.id === 'area-sponsorship' ? <CheckoutButton payload={{ packageCode: 'area_sponsorship', entityType: 'banner' }}>Buy Now</CheckoutButton> : null}
+              {placement.id === 'featured-agency' ? <CheckoutButton payload={{ packageCode: 'featured_agency', entityType: 'agency' }}>Buy Now</CheckoutButton> : null}
             </Card>
           ))}
         </div>
@@ -153,6 +158,11 @@ function PackageSection({ audience, title, description }: { audience: Advertisin
 }
 
 function PackageCard({ item }: { item: AdvertisingPackage }) {
+  const selfService: Record<string, { packageCode: string; entityType: 'agency' | 'developer' }> = {
+    'starter-agency': { packageCode: 'agency_starter_monthly', entityType: 'agency' },
+    'growth-agency': { packageCode: 'agency_growth_monthly', entityType: 'agency' },
+    'premium-developer': { packageCode: 'developer_premium_monthly', entityType: 'developer' },
+  };
   return (
     <Card className="flex h-full flex-col p-5">
       <div className="flex min-h-8 items-start justify-between gap-3">
@@ -165,7 +175,7 @@ function PackageCard({ item }: { item: AdvertisingPackage }) {
       <ul className="mt-4 grid flex-1 gap-2 text-sm text-ink">
         {item.features.map((feature) => <li key={feature} className="rounded-md bg-stone-50 px-3 py-2">{feature}</li>)}
       </ul>
-      <Button className="mt-5 w-full" asChild href="#advertising-inquiry">{item.ctaLabel}</Button>
+      {selfService[item.id] ? <div className="mt-5"><CheckoutButton payload={selfService[item.id]}>Buy Now</CheckoutButton></div> : <Button className="mt-5 w-full" asChild href="#advertising-inquiry">{item.ctaLabel}</Button>}
     </Card>
   );
 }

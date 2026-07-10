@@ -48,12 +48,15 @@ export class AdminOperationsController {
   @Get('projects') projects(@Query('status') status?: string) { return this.admin.projects({ status }); }
   @Get('promotions') promotions(@Query('status') status?: string) { return this.admin.promotions({ status }); }
   @Get('subscriptions') subscriptions(@Query('status') status?: string) { return this.admin.subscriptions({ status }); }
+  @Get('system-events') systemEvents(@Query('limit') limit?: string) { return this.admin.systemEventsList(Number(limit ?? 100)); }
+  @Post('system-events/:id/resolve') resolveSystemEvent(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) { return this.admin.resolveSystemEvent(user.id, id); }
   @Get('cms/pages') cmsPages() { return this.admin.cmsPages(); }
   @Get('cms/blog-posts') blogPosts() { return this.admin.blogPosts(); }
   @Get('users') users() { return this.admin.users(); }
   @Get('users/:id') user(@Param('id') id: string) { return this.admin.user(id); }
   @Post('users/create-admin') createAdminUser(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateAdminUserDto) { return this.admin.createAdminUser(user.id, dto); }
   @Post('payments/:id/reconcile') reconcilePayment(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) { return this.admin.reconcilePayment(user.id, id); }
+  @Post('promotions/expire') expirePromotions(@CurrentUser() user: AuthenticatedUser) { return this.admin.expirePromotions(user.id); }
   @Post('analytics/rollups/run') runRollups(@Body() dto: RollupDto) { return this.admin.runRollups(dto); }
   @Post('analytics/rollups/rebuild') rebuildRollups(@Body() dto: RollupDto) { return this.admin.runRollups(dto); }
   @Get('analytics/rollups/status') rollupStatus() { return this.admin.rollupStatus(); }

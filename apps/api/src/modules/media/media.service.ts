@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, UnprocessableEntityException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, createHmac, randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
@@ -8,12 +8,14 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'ap
 
 @Injectable()
 export class MediaService {
+  private readonly logger = new Logger(MediaService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {}
 
   async presign(userId: string, dto: PresignUploadDto) {
+    const started = Date.now();
     if (!ALLOWED_TYPES.includes(dto.contentType)) throw new UnprocessableEntityException('Unsupported media file type');
     await this.assertCanUpload(userId, dto.entityType, dto.entityId);
     const key = `${dto.entityType}s/${dto.entityId}/${randomUUID()}-${this.cleanName(dto.filename)}`;
@@ -22,10 +24,12 @@ export class MediaService {
     const region = this.config.get<string>('AWS_REGION') ?? 'us-east-1';
     const url = publicBase ? `${publicBase.replace(/\/$/, '')}/${key}` : bucket ? `https://${bucket}.s3.${region}.amazonaws.com/${key}` : `/uploads/${key}`;
     if (!bucket || !this.config.get<string>('AWS_ACCESS_KEY_ID') || !this.config.get<string>('AWS_SECRET_ACCESS_KEY')) {
-      return { uploadUrl: url, storageKey: key, url, method: 'PUT', mode: 'development' };
+      const result = { uploadUrl: url, storageKey: key, url, method: 'PUT', mode: 'development' }; this.logPresign(started, userId, dto.entityType, dto.entityId); return result;
     }
-    return { uploadUrl: this.s3PresignedPutUrl(bucket, region, key, dto.contentType), storageKey: key, url, method: 'PUT', mode: 's3' };
+    const result = { uploadUrl: this.s3PresignedPutUrl(bucket, region, key, dto.contentType), storageKey: key, url, method: 'PUT', mode: 's3' }; this.logPresign(started, userId, dto.entityType, dto.entityId); return result;
   }
+
+  private logPresign(started: number, userId: string, entityType: string, entityId: string) { const durationMs = Date.now() - started; this.logger[durationMs > 1000 ? 'warn' : 'log']({ action: durationMs > 1000 ? 's3.presign.slow' : 's3.presign.created', durationMs, userId, entityType, entityId }); }
 
   private async assertCanUpload(userId: string, entityType: 'listing' | 'project', entityId: string) {
     if (entityType === 'listing') {

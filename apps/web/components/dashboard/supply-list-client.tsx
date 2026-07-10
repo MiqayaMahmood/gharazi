@@ -12,6 +12,7 @@ import { formatDate, formatPrice } from '@/lib/utils';
 import { archiveListing, archiveProject, markListingRented, markListingSold, refreshListing } from '@/lib/api/supply';
 import { getUserFriendlyErrorMessage } from '@/lib/api/mock-fallback';
 import { getDashboardListingEditHref, getDashboardProjectEditHref, getListingHref, getProjectHref } from '@/lib/routes';
+import { CheckoutButton } from '@/components/payments/checkout-button';
 
 export function MyListingsClient() {
   const queryClient = useQueryClient();
@@ -49,6 +50,8 @@ export function MyListingsClient() {
               <Button asChild href={getDashboardListingEditHref(listing.id)}>Edit</Button>
               <Button asChild href={`/dashboard/inquiries?listingId=${listing.id}`} variant="secondary">View leads</Button>
               <Button asChild href={`/dashboard/chats?listingId=${listing.id}`} variant="secondary">Messages</Button>
+              <CheckoutButton payload={{ packageCode: 'listing_hot', entityType: 'listing', entityId: listing.id }} variant="secondary">Make Hot</CheckoutButton>
+              <CheckoutButton payload={{ packageCode: 'listing_super_hot', entityType: 'listing', entityId: listing.id }} variant="secondary">Make Featured</CheckoutButton>
               <Button type="button" variant="secondary" disabled={action.isPending} onClick={() => action.mutate({ id: listing.id, type: 'refresh' })}>Refresh</Button>
               <Button type="button" variant="secondary" disabled={action.isPending} onClick={() => window.confirm('Mark this listing sold?') && action.mutate({ id: listing.id, type: 'sold' })}>Mark sold</Button>
               <Button type="button" variant="secondary" disabled={action.isPending} onClick={() => window.confirm('Mark this listing rented?') && action.mutate({ id: listing.id, type: 'rented' })}>Mark rented</Button>
@@ -92,6 +95,8 @@ export function MyProjectsClient() {
               <Button asChild href={getDashboardProjectEditHref(project.id)}>Edit</Button>
               <Button asChild href={`/dashboard/inquiries?projectId=${project.id}`} variant="secondary">View leads</Button>
               <Button asChild href={`/dashboard/chats?projectId=${project.id}`} variant="secondary">Messages</Button>
+              <CheckoutButton payload={{ packageCode: 'project_spotlight', entityType: 'project', entityId: project.id }} variant="secondary">Promote Project</CheckoutButton>
+              <CheckoutButton payload={{ packageCode: 'project_featured', entityType: 'project', entityId: project.id }} variant="secondary">Feature Project</CheckoutButton>
               <Button type="button" variant="ghost" disabled={archive.isPending} onClick={() => window.confirm('Archive this project?') && archive.mutate(project.id)}>Archive</Button>
             </div>
           </div>

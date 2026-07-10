@@ -59,11 +59,12 @@ export function DashboardOverviewClient() {
       <Card className="p-5">
         <h2 className="text-xl font-black">Company / Professional tools</h2>
         <p className="mt-2 text-sm leading-6 text-muted">
-          Company profile, multi-agent management, developer project tooling, verification, subscriptions, and listing limits are planned for the next phase. Current listing, project, inquiry, chat, and profile tools remain available here.
+          View paid package options and manage your current company or professional tools. Subscription activation is confirmed securely by Stripe webhooks.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button asChild href="/help" variant="secondary">Read account guidance</Button>
           <Button asChild href="/dashboard/profile" variant="secondary">Update profile</Button>
+          <Button asChild href="/advertise">View packages</Button>
         </div>
       </Card>
       <div className="grid gap-4 lg:grid-cols-2">

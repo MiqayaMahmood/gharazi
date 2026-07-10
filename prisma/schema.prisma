@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres.ydgjhffwapjdnepqvzhp:Liviton123$$@aws-1-eu-north-1.pooler.supabase.com:5432/postgres?schema=sch_gharazi"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -50,6 +50,7 @@ model User {
   profile                      UserProfile?
   roles                        UserRole[]
   subscriptions                UserSubscription[]
+  systemEvents                 SystemEvent[]
   reviewedVerificationRequests VerificationRequest[]  @relation("VerificationReviewer")
   verificationRequests         VerificationRequest[]  @relation("VerificationRequester")
 
@@ -631,19 +632,26 @@ model SubscriptionPlan {
 }
 
 model UserSubscription {
-  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId            String           @map("user_id") @db.Uuid
-  planId            String           @map("plan_id") @db.Uuid
-  status            String           @default("active") @db.VarChar(32)
-  startAt           DateTime         @map("start_at") @db.Timestamptz(6)
-  endAt             DateTime?        @map("end_at") @db.Timestamptz(6)
-  autoRenew         Boolean          @default(false) @map("auto_renew")
-  paymentProvider   String?          @map("payment_provider") @db.VarChar(64)
-  externalReference String?          @map("external_reference") @db.VarChar(120)
-  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  plan              SubscriptionPlan @relation(fields: [planId], references: [id])
-  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId               String           @map("user_id") @db.Uuid
+  planId               String           @map("plan_id") @db.Uuid
+  status               String           @default("active") @db.VarChar(32)
+  startAt              DateTime         @map("start_at") @db.Timestamptz(6)
+  endAt                DateTime?        @map("end_at") @db.Timestamptz(6)
+  autoRenew            Boolean          @default(false) @map("auto_renew")
+  paymentProvider      String?          @map("payment_provider") @db.VarChar(64)
+  externalReference    String?          @map("external_reference") @db.VarChar(120)
+  packageCode          String?          @map("package_code") @db.VarChar(64)
+  stripeCustomerId     String?          @map("stripe_customer_id") @db.VarChar(160)
+  stripeSubscriptionId String?          @unique @map("stripe_subscription_id") @db.VarChar(160)
+  currentPeriodStart   DateTime?        @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd     DateTime?        @map("current_period_end") @db.Timestamptz(6)
+  cancelAtPeriodEnd    Boolean          @default(false) @map("cancel_at_period_end")
+  metadataJson         Json?            @map("metadata_json")
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  plan                 SubscriptionPlan @relation(fields: [planId], references: [id])
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, status])
   @@index([planId])
@@ -651,18 +659,23 @@ model UserSubscription {
 }
 
 model Promotion {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  entityType        String   @map("entity_type") @db.VarChar(32)
-  entityId          String   @map("entity_id") @db.Uuid
-  promotionType     String   @map("promotion_type") @db.VarChar(32)
-  startsAt          DateTime @map("starts_at") @db.Timestamptz(6)
-  endsAt            DateTime @map("ends_at") @db.Timestamptz(6)
-  status            String   @default("scheduled") @db.VarChar(32)
-  purchasedByUserId String   @map("purchased_by_user_id") @db.Uuid
-  notes             String?  @db.VarChar(1000)
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  purchasedByUser   User     @relation("PromotionPurchaser", fields: [purchasedByUserId], references: [id])
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType           String   @map("entity_type") @db.VarChar(32)
+  entityId             String   @map("entity_id") @db.Uuid
+  promotionType        String   @map("promotion_type") @db.VarChar(32)
+  startsAt             DateTime @map("starts_at") @db.Timestamptz(6)
+  endsAt               DateTime @map("ends_at") @db.Timestamptz(6)
+  status               String   @default("scheduled") @db.VarChar(32)
+  purchasedByUserId    String   @map("purchased_by_user_id") @db.Uuid
+  notes                String?  @db.VarChar(1000)
+  packageCode          String?  @map("package_code") @db.VarChar(64)
+  placementCode        String?  @map("placement_code") @db.VarChar(64)
+  isHot                Boolean  @default(false) @map("is_hot")
+  isFeatured           Boolean  @default(false) @map("is_featured")
+  paymentTransactionId String?  @unique @map("payment_transaction_id") @db.Uuid
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  purchasedByUser      User     @relation("PromotionPurchaser", fields: [purchasedByUserId], references: [id])
 
   @@index([entityType, entityId, status])
   @@index([purchasedByUserId, status])
@@ -761,20 +774,25 @@ model AdminNote {
 }
 
 model PaymentTransaction {
-  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId            String           @map("user_id") @db.Uuid
-  entityType        String           @map("entity_type") @db.VarChar(32)
-  entityId          String           @map("entity_id") @db.Uuid
-  provider          String           @db.VarChar(64)
-  providerReference String?          @map("provider_reference") @db.VarChar(160)
-  amount            Decimal          @db.Decimal(14, 2)
-  currency          String           @default("PKR") @db.VarChar(3)
-  status            String           @default("pending") @db.VarChar(32)
-  metadataJson      Json?            @map("metadata_json")
-  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  attempts          PaymentAttempt[]
-  user              User             @relation(fields: [userId], references: [id])
+  id                      String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                  String           @map("user_id") @db.Uuid
+  entityType              String           @map("entity_type") @db.VarChar(32)
+  entityId                String?          @map("entity_id") @db.Uuid
+  provider                String           @db.VarChar(64)
+  providerReference       String?          @map("provider_reference") @db.VarChar(160)
+  stripeCheckoutSessionId String?          @unique @map("stripe_checkout_session_id") @db.VarChar(160)
+  stripePaymentIntentId   String?          @unique @map("stripe_payment_intent_id") @db.VarChar(160)
+  stripeSubscriptionId    String?          @map("stripe_subscription_id") @db.VarChar(160)
+  packageCode             String?          @map("package_code") @db.VarChar(64)
+  amount                  Decimal          @db.Decimal(14, 2)
+  currency                String           @default("PKR") @db.VarChar(3)
+  status                  String           @default("pending") @db.VarChar(32)
+  metadataJson            Json?            @map("metadata_json")
+  createdAt               DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  paidAt                  DateTime?        @map("paid_at") @db.Timestamptz(6)
+  attempts                PaymentAttempt[]
+  user                    User             @relation(fields: [userId], references: [id])
 
   @@index([userId, status])
   @@index([entityType, entityId])
@@ -797,6 +815,27 @@ model PaymentAttempt {
 
   @@index([transactionId])
   @@map("payment_attempts")
+}
+
+model SystemEvent {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  severity    String    @db.VarChar(16)
+  source      String    @db.VarChar(32)
+  message     String    @db.VarChar(500)
+  detailsJson Json?     @map("details_json")
+  requestId   String?   @map("request_id") @db.VarChar(120)
+  entityType  String?   @map("entity_type") @db.VarChar(32)
+  entityId    String?   @map("entity_id") @db.Uuid
+  userId      String?   @map("user_id") @db.Uuid
+  status      String    @default("open") @db.VarChar(16)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  resolvedAt  DateTime? @map("resolved_at") @db.Timestamptz(6)
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status, severity, createdAt])
+  @@index([source, createdAt])
+  @@index([requestId])
+  @@map("system_events")
 }
 
 model AnalyticsEvent {

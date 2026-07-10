@@ -20,6 +20,7 @@ import {
   runAdminSearchAction,
   setAdminUserStatus,
   updateAdminSubmissionStatus,
+  resolveAdminSystemEvent,
 } from '../../lib/api/admin';
 import {
   useAdminAuditLogs,
@@ -35,6 +36,7 @@ import {
   useAdminSearchStatus,
   useAdminSubmissions,
   useAdminSubscriptions,
+  useAdminSystemEvents,
   useAdminUsers,
   useAdminVerificationRequests,
 } from '@/lib/query/hooks';
@@ -56,7 +58,8 @@ type Resource =
   | 'blog-posts'
   | 'risk'
   | 'data-integrity'
-  | 'search-ops';
+  | 'search-ops'
+  | 'system-events';
 
 type QueryResult = { data?: Record<string, unknown>[]; isLoading: boolean; isError: boolean };
 
@@ -77,6 +80,7 @@ const titles: Record<Resource, [string, string]> = {
   risk: ['Risk Flags', 'Review trust and safety flags.'],
   'data-integrity': ['Data Integrity', 'Run checks and repair indexing/status inconsistencies.'],
   'search-ops': ['Search Ops', 'Inspect search status and queue reindex jobs.'],
+  'system-events': ['System Events', 'Review and resolve recent API, provider, and worker alerts.'],
 };
 
 function text(value: unknown): string {
@@ -101,6 +105,7 @@ function useResource(resource: Resource): QueryResult {
   const risk = useAdminRiskFlags();
   const dataIntegrity = useAdminDataIntegrity();
   const searchStatus = useAdminSearchStatus();
+  const systemEvents = useAdminSystemEvents();
 
   const map: Record<Resource, QueryResult> = {
     users,
@@ -119,6 +124,7 @@ function useResource(resource: Resource): QueryResult {
     risk,
     'data-integrity': { data: dataIntegrity.data ? [dataIntegrity.data] : [], isLoading: dataIntegrity.isLoading, isError: dataIntegrity.isError },
     'search-ops': { data: searchStatus.data ? [searchStatus.data] : [], isLoading: searchStatus.isLoading, isError: searchStatus.isError },
+    'system-events': systemEvents,
   };
   return map[resource];
 }
@@ -168,6 +174,37 @@ function columnsFor(resource: Resource) {
     status,
     { key: 'createdAt', label: 'Date', render: (row: Record<string, unknown>) => formatDate(row.createdAt) },
   ];
+  if (resource === 'payments') return [
+    { key: 'packageCode', label: 'Package' },
+    { key: 'user.profile.fullName', label: 'User', render: (row: Record<string, unknown>) => text(readPath(row, 'user.profile.fullName') ?? readPath(row, 'user.email') ?? row.userId) },
+    { key: 'entityType', label: 'Entity', render: (row: Record<string, unknown>) => `${text(row.entityType)} ${text(row.entityId).slice(0, 8)}` },
+    { key: 'amount', label: 'Amount', render: (row: Record<string, unknown>) => `${text(row.currency)} ${text(row.amount)}` },
+    status,
+    { key: 'stripeCheckoutSessionId', label: 'Stripe reference', render: (row: Record<string, unknown>) => text(row.stripePaymentIntentId ?? row.stripeSubscriptionId ?? row.stripeCheckoutSessionId) },
+    { key: 'paidAt', label: 'Paid / created', render: (row: Record<string, unknown>) => formatDate(row.paidAt ?? row.createdAt) },
+  ];
+  if (resource === 'promotions') return [
+    { key: 'packageCode', label: 'Package', render: (row: Record<string, unknown>) => text(row.packageCode ?? row.promotionType) },
+    { key: 'entityType', label: 'Entity', render: (row: Record<string, unknown>) => `${text(row.entityType)} ${text(row.entityId).slice(0, 8)}` },
+    status,
+    { key: 'startsAt', label: 'Starts', render: (row: Record<string, unknown>) => formatDate(row.startsAt) },
+    { key: 'endsAt', label: 'Ends', render: (row: Record<string, unknown>) => formatDate(row.endsAt) },
+  ];
+  if (resource === 'subscriptions') return [
+    { key: 'packageCode', label: 'Package', render: (row: Record<string, unknown>) => text(row.packageCode ?? readPath(row, 'plan.code')) },
+    { key: 'user.profile.fullName', label: 'User', render: (row: Record<string, unknown>) => text(readPath(row, 'user.profile.fullName') ?? readPath(row, 'user.email') ?? row.userId) },
+    status,
+    { key: 'stripeSubscriptionId', label: 'Stripe subscription' },
+    { key: 'currentPeriodEnd', label: 'Period end', render: (row: Record<string, unknown>) => formatDate(row.currentPeriodEnd ?? row.endAt) },
+  ];
+  if (resource === 'system-events') return [
+    { key: 'severity', label: 'Severity', render: (row: Record<string, unknown>) => <StatusBadge value={row.severity} /> },
+    { key: 'source', label: 'Source' },
+    { key: 'message', label: 'Message' },
+    { key: 'requestId', label: 'Request ID' },
+    status,
+    { key: 'createdAt', label: 'Created', render: (row: Record<string, unknown>) => formatDate(row.createdAt) },
+  ];
   return [
     { key: 'id', label: 'ID', render: (row: Record<string, unknown>) => text(row.id).slice(0, 16) },
     { key: 'name', label: 'Name / Title', render: (row: Record<string, unknown>) => text(row.name ?? row.title ?? row.promotionType ?? row.action ?? row.entityType ?? row.planId) },
@@ -188,6 +225,7 @@ function useActions(resource: Resource) {
       if (resource === 'verification') return reviewAdminVerification(id, action === 'reject' ? 'reject' : 'approve', action === 'reject' ? 'Rejected from admin dashboard' : undefined);
       if (resource === 'submissions') return action === 'assign' ? assignAdminSubmission(id, '', 'Assignment pending') : updateAdminSubmissionStatus(id, action);
       if (resource === 'payments') return reconcileAdminPayment(id);
+      if (resource === 'system-events') return resolveAdminSystemEvent(id);
       if (resource === 'data-integrity') return repairAdminDataIntegrity();
       if (resource === 'search-ops') return action === 'bootstrap' ? bootstrapAdminSearch() : runAdminSearchAction(action as 'listings' | 'projects' | 'areas');
       return Promise.resolve(row);
@@ -262,6 +300,7 @@ export function AdminResourceClient({ resource }: { resource: Resource }) {
           if (resource === 'reports') return <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => mutation.mutate({ row, action: 'resolve' })}>Resolve</Button><Button variant="ghost" onClick={() => mutation.mutate({ row, action: 'dismiss' })}>Dismiss</Button></div>;
           if (resource === 'submissions') return <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => mutation.mutate({ row, action: 'in_progress' })}>In progress</Button><Button variant="ghost" onClick={() => mutation.mutate({ row, action: 'resolved' })}>Resolve</Button></div>;
           if (resource === 'payments') return <Button variant="secondary" onClick={() => mutation.mutate({ row, action: 'reconcile' })}>Reconcile</Button>;
+          if (resource === 'system-events' && row.status === 'open') return <Button variant="secondary" onClick={() => mutation.mutate({ row, action: 'resolve' })}>Resolve</Button>;
           return null;
         }}
       />

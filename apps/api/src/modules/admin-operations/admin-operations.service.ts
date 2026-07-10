@@ -13,6 +13,8 @@ import { UpdateRiskFlagDto } from '../risk/dto/update-risk-flag.dto';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { RollupDto } from './dto/rollup.dto';
 import { PaymentsService } from '../payments/payments.service';
+import { PromotionsService } from '../promotions/promotions.service';
+import { SystemEventsService } from '../system-events/system-events.service';
 import { AdminRoleDto, CreateAdminUserDto } from './dto/admin-users.dto';
 import { ListingContactUpdatesQueryDto, UpdateListingContactDto } from './dto/listing-contact-update.dto';
 
@@ -27,17 +29,23 @@ export class AdminOperationsService {
     private readonly risk: RiskService,
     private readonly analytics: AnalyticsService,
     private readonly paymentsService: PaymentsService,
+    private readonly promotionsService: PromotionsService,
+    private readonly systemEvents: SystemEventsService,
   ) {}
 
   async overview() {
-    const [users, listings, projects, reports, verificationRequests] = await Promise.all([
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const [users, listings, projects, reports, verificationRequests, openCriticalAlerts, paymentFailuresToday, recentErrors] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.listing.count(),
       this.prisma.project.count(),
       this.prisma.report.count({ where: { status: 'open' } }),
       this.prisma.verificationRequest.count({ where: { status: 'pending' } }),
+      this.systemEvents.openCriticalCount(),
+      this.prisma.paymentTransaction.count({ where: { status: 'failed', updatedAt: { gte: today } } }),
+      this.prisma.systemEvent.findMany({ where: { severity: { in: ['error', 'critical'] } }, orderBy: { createdAt: 'desc' }, take: 5 }),
     ]);
-    return { users, listings, projects, openReports: reports, pendingVerificationRequests: verificationRequests };
+    return { users, listings, projects, openReports: reports, pendingVerificationRequests: verificationRequests, openCriticalAlerts, paymentFailuresToday, recentErrors };
   }
 
   reports(filters: { status?: string; entityType?: string; reasonCode?: string }) {
@@ -440,6 +448,15 @@ export class AdminOperationsService {
     await this.audit.record({ actorUserId, action: 'payment.reconcile', entityType: 'payment_transaction', entityId: id });
     return result;
   }
+
+  async expirePromotions(actorUserId: string) {
+    const result = await this.promotionsService.endExpiredPromotions();
+    await this.audit.record({ actorUserId, action: 'promotion.expiry.repair', entityType: 'promotion', metadataJson: result });
+    return result;
+  }
+
+  systemEventsList(limit?: number) { return this.systemEvents.recent(limit); }
+  async resolveSystemEvent(actorUserId: string, id: string) { const event = await this.systemEvents.resolve(id); await this.audit.record({ actorUserId, action: 'system_event.resolve', entityType: 'system_event', entityId: id }); return event; }
 
   private async missingIndexDocuments(alias: 'listings' | 'projects', entities: Array<{ id: string; publicId: string }>) {
     const index = this.elasticsearch.alias(alias);

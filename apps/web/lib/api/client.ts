@@ -7,13 +7,15 @@ export class ApiRequestError extends Error {
   status: number;
   details?: unknown;
   path: string;
+  requestId?: string;
 
-  constructor(message: string, status: number, path: string, details?: unknown) {
+  constructor(message: string, status: number, path: string, details?: unknown, requestId?: string) {
     super(message);
     this.name = 'ApiRequestError';
     this.status = status;
     this.path = path;
     this.details = details;
+    this.requestId = requestId;
   }
 }
 
@@ -52,11 +54,19 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (!response.ok) {
     const details = await parseErrorBody(response);
     const message = extractErrorMessage(details) || `Request failed with ${response.status}`;
-    throw new ApiRequestError(message, response.status, path, details);
+    const requestId = extractRequestId(details) ?? response.headers.get('x-request-id') ?? undefined;
+    if (process.env.NODE_ENV === 'development') console.error('API request failed', { endpoint: path, status: response.status, requestId, message });
+    throw new ApiRequestError(message, response.status, path, details, requestId);
   }
 
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
+}
+
+function extractRequestId(details: unknown) {
+  if (!details || typeof details !== 'object') return undefined;
+  const requestId = (details as { requestId?: unknown }).requestId;
+  return typeof requestId === 'string' ? requestId : undefined;
 }
 
 export function toQueryString(params: Record<string, string | number | boolean | undefined | null>) {

@@ -1,10 +1,10 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, Param, Post, Query, RawBodyRequest, Req, UseGuards } from '@nestjs/common';
+import { Request } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthenticatedUser } from '@Gharazi/shared-types';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
 import { CheckoutDto } from './dto/checkout.dto';
-import { PaymentWebhookDto } from './dto/payment-webhook.dto';
 import { PaymentsService } from './payments.service';
 
 @ApiTags('payments')
@@ -19,9 +19,14 @@ export class PaymentsController {
     return this.payments.checkout(user.id, dto);
   }
 
-  @Post('webhook/:provider')
-  webhook(@Param('provider') provider: string, @Body() dto: PaymentWebhookDto) {
-    return this.payments.handleWebhook(provider, dto);
+  @Get('packages')
+  packages() { return this.payments.packages(); }
+
+  @Post('webhook/stripe')
+  stripeWebhook(@Req() request: RawBodyRequest<Request>, @Headers('stripe-signature') signature?: string) {
+    if (!request.rawBody || !signature) throw new BadRequestException('Stripe signature and raw body are required');
+    try { return this.payments.handleStripeEvent(this.payments.constructEvent(request.rawBody, signature)); }
+    catch { throw new BadRequestException('Stripe webhook signature is invalid'); }
   }
 
   @Get('me')
@@ -30,6 +35,11 @@ export class PaymentsController {
   mine(@CurrentUser() user: AuthenticatedUser) {
     return this.payments.mine(user.id);
   }
+
+  @Get('session/status')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  sessionStatus(@CurrentUser() user: AuthenticatedUser, @Query('sessionId') sessionId: string) { return this.payments.getBySession(user.id, sessionId); }
 
   @Get(':id')
   @ApiBearerAuth()

@@ -10,6 +10,7 @@ import {
   getAdminDataIntegrity,
   getAdminOverview,
   getAdminSearchStatus,
+  getAdminSystemHealth,
   listAdminAuditLogs,
   listAdminBlogPosts,
   listAdminCmsPages,
@@ -23,6 +24,7 @@ import {
   listAdminSubscriptions,
   listAdminUsers,
   listAdminVerificationRequests,
+  listAdminSystemEvents,
 } from '@/lib/api/admin';
 
 export function useListings(params: ListingSearchParams) {
@@ -175,6 +177,9 @@ export function useAreas(cityId?: string) {
 export function useAdminOverview() {
   return useQuery({ queryKey: ['admin-overview'], queryFn: getAdminOverview, retry: false });
 }
+
+export function useAdminSystemHealth() { return useQuery({ queryKey: ['admin-system-health'], queryFn: getAdminSystemHealth, retry: false, refetchInterval: 30000 }); }
+export function useAdminSystemEvents() { return useQuery({ queryKey: ['admin-system-events'], queryFn: listAdminSystemEvents, retry: false }); }
 
 export function useAdminUsers() {
   return useQuery({ queryKey: ['admin-users'], queryFn: listAdminUsers, retry: false });

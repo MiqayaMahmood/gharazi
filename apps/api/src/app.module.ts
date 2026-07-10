@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -37,6 +37,9 @@ import { SearchOpsModule } from './modules/search-ops/search-ops.module';
 import { SubmissionsModule } from './modules/submissions/submissions.module';
 import { MediaModule } from './modules/media/media.module';
 import { NewsletterModule } from './modules/newsletter/newsletter.module';
+import { SystemEventsModule } from './modules/system-events/system-events.module';
+import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
+import { ApiExceptionFilter } from './common/filters/api-exception.filter';
 
 @Module({
   imports: [
@@ -54,6 +57,7 @@ import { NewsletterModule } from './modules/newsletter/newsletter.module';
       ],
     }),
     DatabaseModule,
+    SystemEventsModule,
     RedisModule,
     QueueModule,
     ElasticsearchModule,
@@ -88,6 +92,8 @@ import { NewsletterModule } from './modules/newsletter/newsletter.module';
     TaxonomyModule,
     HealthModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }, ApiExceptionFilter],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) { consumer.apply(RequestContextMiddleware).forRoutes('*'); }
+}

@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AdminPageHeader, AdminLoading, AdminError, StatusBadge, formatDate } from './admin-primitives';
-import { useAdminOverview, useAdminReports, useAdminVerificationRequests, useAdminSubmissions, useAdminAnalyticsSummary } from '@/lib/query/hooks';
+import { useAdminOverview, useAdminReports, useAdminVerificationRequests, useAdminSubmissions, useAdminAnalyticsSummary, useAdminSystemHealth } from '@/lib/query/hooks';
 
 export function AdminOverviewClient() {
   const [range, setRange] = useState('current_month');
@@ -14,6 +14,7 @@ export function AdminOverviewClient() {
   const verifications = useAdminVerificationRequests();
   const submissions = useAdminSubmissions();
   const analytics = useAdminAnalyticsSummary(range);
+  const systemHealth = useAdminSystemHealth();
 
   if (overview.isLoading) return <AdminLoading />;
   if (overview.isError) return <AdminError />;
@@ -33,6 +34,9 @@ export function AdminOverviewClient() {
     ['Project views', String(analytics.data?.projectViews ?? '-')],
     ['Favorites', String(analytics.data?.favoritesCreated ?? '-')],
     ['Newsletter subscribers', String(analytics.data?.newsletterSubscribers ?? '-')],
+    ['Open critical alerts', String(overview.data?.openCriticalAlerts ?? '-')],
+    ['Payment failures today', String(overview.data?.paymentFailuresToday ?? '-')],
+    ['System status', String(systemHealth.data?.status ?? 'checking')],
   ];
 
   return (
@@ -48,6 +52,7 @@ export function AdminOverviewClient() {
             <option value="previous_month">Previous month</option>
           </select>
           <Button href="/admin/users" asChild variant="secondary">Manage users</Button>
+          <Button href="/admin/system-health" asChild variant="secondary">System health</Button>
         </div>}
       />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

@@ -13,6 +13,7 @@ import { SubscriptionAlertsProcessor } from './jobs/subscriptions/subscription-a
 import { RiskFollowupsProcessor } from './jobs/risk/risk-followups.processor';
 import { SearchDocumentBuilder } from './jobs/search-indexing/search-document.builder';
 import { SearchIndexingProcessor } from './jobs/search-indexing/search-indexing.processor';
+import { WorkerObservabilityService } from './observability/worker-observability.service';
 
 const logger = new Logger('WorkerModule');
 
@@ -58,6 +59,7 @@ const logger = new Logger('WorkerModule');
     PaymentFollowupsProcessor,
     SubscriptionAlertsProcessor,
     RiskFollowupsProcessor,
+    WorkerObservabilityService,
   ],
 })
 export class WorkerModule {}
