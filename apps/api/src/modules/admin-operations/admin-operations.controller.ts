@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthenticatedUser } from '@Gharazi/shared-types';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -11,6 +11,7 @@ import { CreateRiskFlagDto } from '../risk/dto/create-risk-flag.dto';
 import { UpdateRiskFlagDto } from '../risk/dto/update-risk-flag.dto';
 import { RollupDto } from './dto/rollup.dto';
 import { AdminRoleDto, CreateAdminUserDto } from './dto/admin-users.dto';
+import { ListingContactUpdatesQueryDto, UpdateListingContactDto } from './dto/listing-contact-update.dto';
 import { AdminOperationsService } from './admin-operations.service';
 
 @ApiTags('admin')
@@ -32,6 +33,18 @@ export class AdminOperationsController {
   }
   @Get('payments') payments() { return this.admin.payments(); }
   @Get('listings') listings(@Query('status') status?: string) { return this.admin.listings({ status }); }
+  @Get('listing-contact-updates')
+  @RequireRoles('admin')
+  listingContactUpdates(@Query() query: ListingContactUpdatesQueryDto) {
+    return this.admin.listingContactUpdates(query);
+  }
+
+  @Patch('listing-contact-updates/:id')
+  @RequireRoles('admin')
+  updateListingContact(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: UpdateListingContactDto) {
+    return this.admin.updateListingContact(user.id, id, dto);
+  }
+
   @Get('projects') projects(@Query('status') status?: string) { return this.admin.projects({ status }); }
   @Get('promotions') promotions(@Query('status') status?: string) { return this.admin.promotions({ status }); }
   @Get('subscriptions') subscriptions(@Query('status') status?: string) { return this.admin.subscriptions({ status }); }

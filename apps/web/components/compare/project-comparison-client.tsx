@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState, ErrorState, Skeleton } from '@/components/ui/state';
 import { useBatchProjects } from '@/lib/query/hooks';
+import { getProjectHref } from '@/lib/routes';
 import { formatDate, formatPrice } from '@/lib/utils';
 import { useCompareStore } from '@/stores/ui-store';
 
@@ -48,7 +49,7 @@ export function ProjectComparisonClient() {
               <th className="border-b border-line p-3 text-left">Field</th>
               {validIds.map((id) => (
                 <th key={id} className="border-b border-line p-3 text-left">
-                  <Link className="font-black text-trust" href={`/project/${lookup[id]?.slug}`}>{lookup[id]?.name}</Link>
+                  {lookup[id] ? <Link className="font-black text-trust" href={getProjectHref(lookup[id])}>{lookup[id]?.name}</Link> : null}
                   <Button className="mt-2" variant="ghost" onClick={() => remove(id)}>Remove</Button>
                 </th>
               ))}

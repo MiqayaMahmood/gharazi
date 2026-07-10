@@ -95,11 +95,12 @@ prisma/
 ```bash
 npm install
 cp .env.example .env
-docker compose up -d
 npm run prisma:generate
 npm run prisma:migrate
 npm run prisma:seed
 ```
+
+Supabase is used only as hosted PostgreSQL. Prisma connects through `DATABASE_URL`; the app does not use Supabase client APIs or a Supabase service role key.
 
 Use a long random value for `JWT_SECRET` before running outside local development.
 
@@ -446,7 +447,9 @@ Docker Compose includes an OpenTelemetry Collector. Prometheus-format metrics ar
 
 ## Public Beta Launch Checklist
 
-- Set `JWT_SECRET`, database, Redis, Elasticsearch, and public web/API URLs for the target environment.
+- For Railway API and worker services, set `DATABASE_URL=<Supabase Postgres URL>` and, only if Prisma migrations require it, `DIRECT_URL=<optional direct URL>`.
+- For Vercel web, do not set `DATABASE_URL` or any Supabase service role key. Web only needs `NEXT_PUBLIC_API_BASE_URL=<Railway API URL>` for API access.
+- Set `JWT_SECRET`, Redis, Elasticsearch, and public web/API URLs for the target environment.
 - Set `NEXT_PUBLIC_ENABLE_MOCK_FALLBACK=false` for production-like and beta testing.
 - Run `npm install`, `npm run prisma:generate`, and `npm run prisma:deploy`.
 - Seed demo data with `npm run prisma:seed` for beta walkthroughs.
@@ -563,10 +566,13 @@ CLOUDFRONT_BASE_URL=
 ## Database Commands
 
 ```bash
+npx prisma migrate deploy
 npm run prisma:migrate
 npm run prisma:deploy
 npm run prisma:seed
 ```
+
+Use `npx prisma migrate deploy` in deployed environments, then seed with `npm run prisma:seed` when initial or demo data is needed. Both commands run through Prisma using `DATABASE_URL`.
 
 Seed data includes roles, listing purposes, property types, amenity definitions, and a small hierarchical set of cities/areas for development. Elasticsearch is required for full Sprint 3 search behavior and remains enabled by default in development. Docker Compose exposes it at `http://localhost:9200`.
 
@@ -1008,3 +1014,7 @@ Security and launch hardening:
 git init
 git add .
 git commit -m "Initial Homegate beta version"
+
+git remote add origin https://github.com/MiqayaMahmood/gharazi.git
+git branch -M main
+git push -u origin main

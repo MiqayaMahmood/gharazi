@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { autocompleteAreas, batchListings, batchProjects, searchListings, searchProjects, type ListingSearchParams, type ProjectSearchParams } from '@/lib/api/marketplace';
 import { getCurrentUser } from '@/lib/api/auth';
+import { getListingOwnerSummary, getListingViewerContext, getMyListing, getProjectOwnerSummary, getProjectViewerContext } from '@/lib/api/supply';
 import { getPopularListings, getPopularProjects } from '@/lib/api/analytics';
-import { getChatMessages, listChats, listFavorites, listInquiries, listMyListings, listMyProjects, listNotifications, listSavedSearches } from '@/lib/api/engagement';
+import { getChatMessages, getListingContact, listChats, listFavorites, listInquiries, listMyListings, listMyProjects, listNotifications, listSavedSearches } from '@/lib/api/engagement';
 import { listAmenities, listAreas, listCities, listPropertyTypes, listPurposes } from '@/lib/api/reference';
 import {
   getAdminAnalyticsSummary,
@@ -77,6 +78,15 @@ export function useInquiries(enabled = true) {
   return useQuery({ queryKey: ['inquiries'], queryFn: listInquiries, enabled: useAuthenticatedQueryEnabled(enabled) });
 }
 
+export function useListingContact(listingId?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['listing-contact', listingId],
+    queryFn: () => getListingContact(listingId as string),
+    enabled: useAuthenticatedQueryEnabled(enabled && Boolean(listingId)),
+    retry: false,
+  });
+}
+
 export function useChats(enabled = true) {
   return useQuery({ queryKey: ['chats'], queryFn: listChats, enabled: useAuthenticatedQueryEnabled(enabled), refetchInterval: 30_000 });
 }
@@ -93,8 +103,53 @@ export function useMyListings(enabled = true) {
   return useQuery({ queryKey: ['my-listings'], queryFn: listMyListings, enabled: useAuthenticatedQueryEnabled(enabled) });
 }
 
+export function useMyListing(id?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['my-listing', id],
+    queryFn: () => getMyListing(id as string),
+    enabled: useAuthenticatedQueryEnabled(enabled && Boolean(id)),
+    retry: false,
+  });
+}
+
+export function useListingViewerContext(id?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['listing-viewer-context', id],
+    queryFn: () => getListingViewerContext(id as string),
+    enabled: useAuthenticatedQueryEnabled(enabled && Boolean(id)),
+    retry: false,
+  });
+}
+
+export function useListingOwnerSummary(id?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['listing-owner-summary', id],
+    queryFn: () => getListingOwnerSummary(id as string),
+    enabled: useAuthenticatedQueryEnabled(enabled && Boolean(id)),
+    retry: false,
+  });
+}
+
 export function useMyProjects(enabled = true) {
   return useQuery({ queryKey: ['my-projects'], queryFn: listMyProjects, enabled: useAuthenticatedQueryEnabled(enabled) });
+}
+
+export function useProjectViewerContext(id?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['project-viewer-context', id],
+    queryFn: () => getProjectViewerContext(id as string),
+    enabled: useAuthenticatedQueryEnabled(enabled && Boolean(id)),
+    retry: false,
+  });
+}
+
+export function useProjectOwnerSummary(id?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['project-owner-summary', id],
+    queryFn: () => getProjectOwnerSummary(id as string),
+    enabled: useAuthenticatedQueryEnabled(enabled && Boolean(id)),
+    retry: false,
+  });
 }
 
 export function usePurposes() {

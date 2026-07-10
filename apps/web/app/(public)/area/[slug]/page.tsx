@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { mockAreas, mockListings, mockProjects } from '@/lib/mock-data';
 import { RelatedGuides } from '@/components/content/blog-card';
 import { listLatestBlogPosts } from '@/lib/api/wordpress';
+import { Breadcrumbs } from '@/components/navigation/breadcrumbs';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -27,13 +28,14 @@ export default async function AreaPage({ params }: { params: Promise<{ slug: str
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
       <ViewTracker eventType="area_viewed" entityType="area" metadataJson={{ slug, areaId: area?.id, title }} />
+      <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Areas' }, { label: title }]} />
       <Badge>Area intelligence</Badge>
       <h1 className="mt-4 text-4xl font-black">{title}</h1>
       <p className="mt-3 max-w-3xl text-lg text-muted">A structured area page for local discovery, investor context, and internal links across buy, rent, and new project inventory.</p>
       <div className="mt-6 flex flex-wrap gap-2">
-        <Link href={`/buy?q=${encodeURIComponent(title)}`}><InfoChip>Buy in area</InfoChip></Link>
-        <Link href={`/rent?q=${encodeURIComponent(title)}`}><InfoChip>Rent in area</InfoChip></Link>
-        <Link href={`/projects?q=${encodeURIComponent(title)}`}><InfoChip>Projects nearby</InfoChip></Link>
+        <Link href={`/buy?location=${encodeURIComponent(title)}`}><InfoChip>Buy in {area?.name ?? 'area'}</InfoChip></Link>
+        <Link href={`/rent?location=${encodeURIComponent(title)}`}><InfoChip>Rent in {area?.name ?? 'area'}</InfoChip></Link>
+        <Link href={`/projects?location=${encodeURIComponent(title)}`}><InfoChip>Projects near {area?.name ?? 'area'}</InfoChip></Link>
       </div>
       <section className="mt-10 grid gap-4 md:grid-cols-3">
         <Card className="p-5"><h2 className="font-black">Trust cues</h2><p className="mt-2 text-sm text-muted">Verified listing and project signals remain visible in related cards.</p></Card>

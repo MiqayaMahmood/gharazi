@@ -7,7 +7,7 @@ import type { SearchLandingContext } from '@/lib/search/search-context';
 
 export function ListingLandingRecommendations({ context }: { context: SearchLandingContext }) {
   const listings = useListings({
-    purposeCode: context.purpose === 'rent' ? 'rent' : 'sale',
+    purposeSlug: context.purpose === 'rent' ? 'rent' : 'sale',
     propertyTypeCode: context.propertyTypeCode,
     citySlug: context.citySlug,
     sort: 'newest',

@@ -1,0 +1,3 @@
+ALTER TABLE "listings"
+  ADD COLUMN IF NOT EXISTS "contact_whatsapp" VARCHAR(32),
+  ADD COLUMN IF NOT EXISTS "source_url" VARCHAR(1000);

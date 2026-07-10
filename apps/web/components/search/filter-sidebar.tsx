@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
+import { HelpTooltip } from '@/components/ui/help-tooltip';
 import { AreaAutocomplete } from './area-autocomplete';
 
 export type FilterValues = {
@@ -56,7 +57,7 @@ export function FilterSidebar({ values, onChange, onApply, projectMode = false }
       </div>
       <AreaAutocomplete value={values.location} onChange={(value) => set('location', value)} />
       <div>
-        <label className="mb-1 block text-xs font-bold text-muted" htmlFor="type">{projectMode ? 'Project type' : 'Property type'}</label>
+        <label className="mb-1 inline-flex items-center gap-2 text-xs font-bold text-muted" htmlFor="type">{projectMode ? 'Project type' : 'Property type'} <HelpTooltip text="Use property type to narrow results and improve similar listing recommendations." /></label>
         <Select id="type" value={values.propertyTypeId} onChange={(event) => set('propertyTypeId', event.target.value)}>
           <option value="">Any</option>
           <option value="house">House</option>
@@ -66,6 +67,7 @@ export function FilterSidebar({ values, onChange, onApply, projectMode = false }
         </Select>
       </div>
       <div className="grid grid-cols-2 gap-2">
+        <span className="col-span-2 inline-flex items-center gap-2 text-xs font-bold text-muted">Price range <HelpTooltip text="Enter prices in PKR without commas or currency symbols." /></span>
         <Input aria-label="Minimum price" value={values.minPrice} onChange={(event) => set('minPrice', event.target.value)} placeholder="Min price" />
         <Input aria-label="Maximum price" value={values.maxPrice} onChange={(event) => set('maxPrice', event.target.value)} placeholder="Max price" />
       </div>

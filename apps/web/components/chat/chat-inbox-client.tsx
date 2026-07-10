@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,12 +13,19 @@ import { useChatMessages, useChats, useCurrentUser } from '@/lib/query/hooks';
 import { formatDate } from '@/lib/utils';
 
 export function ChatInboxClient() {
+  const searchParams = useSearchParams();
+  const listingId = searchParams.get('listingId');
+  const projectId = searchParams.get('projectId');
   const [activeId, setActiveId] = useState<string | undefined>();
   const [body, setBody] = useState('');
   const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();
   const chats = useChats();
-  const activeChat = useMemo(() => chats.data?.find((chat) => chat.id === (activeId ?? chats.data?.[0]?.id)), [activeId, chats.data]);
+  const filteredChats = useMemo(
+    () => chats.data?.filter((chat) => (!listingId || chat.listingId === listingId) && (!projectId || chat.projectId === projectId)) ?? [],
+    [chats.data, listingId, projectId],
+  );
+  const activeChat = useMemo(() => filteredChats.find((chat) => chat.id === (activeId ?? filteredChats[0]?.id)), [activeId, filteredChats]);
   const messages = useChatMessages(activeChat?.id);
   const sendMutation = useMutation({
     mutationFn: () => sendChatMessage(activeChat?.id as string, body),
@@ -30,12 +38,12 @@ export function ChatInboxClient() {
 
   if (chats.isLoading) return <Skeleton className="h-[520px]" />;
   if (chats.isError) return <ErrorState title="Chats failed to load" message="Please retry after refreshing the page." />;
-  if (!chats.data?.length) return <EmptyState title="No conversations yet" message="Start an inquiry from a listing or project page to open chat." />;
+  if (!filteredChats.length) return <EmptyState title="No conversations yet" message="Start an inquiry from a listing or project page to open chat." />;
 
   return (
     <div className="grid min-h-[560px] overflow-hidden rounded-lg border border-line bg-white shadow-soft lg:grid-cols-[320px_1fr]">
       <aside className="border-b border-line lg:border-b-0 lg:border-r">
-        {chats.data.map((chat) => (
+        {filteredChats.map((chat) => (
           <button key={chat.id} className={`block w-full border-b border-line p-4 text-left hover:bg-emerald-50 ${activeChat?.id === chat.id ? 'bg-emerald-50' : ''}`} type="button" onClick={() => setActiveId(chat.id)}>
             <div className="flex items-center justify-between gap-2">
               <p className="font-bold">{chat.contextType ?? 'Conversation'} {chat.id.slice(0, 6)}</p>

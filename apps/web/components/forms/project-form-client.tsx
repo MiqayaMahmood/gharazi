@@ -26,6 +26,7 @@ import {
   type ProjectUpdatePayload,
 } from '@/lib/api/supply';
 import { useAmenities, useAreas, useCities, usePropertyTypes } from '@/lib/query/hooks';
+import { getDashboardProjectEditHref } from '@/lib/routes';
 import type { Project } from '@/types/marketplace';
 
 const steps = ['Basics', 'Location', 'Overview', 'Payment', 'Units', 'Media', 'Updates', 'Review'];
@@ -98,7 +99,7 @@ export function ProjectFormClient({ initialProject }: { initialProject?: Project
     mutationFn: saveProject,
     onSuccess: (project) => {
       void queryClient.invalidateQueries({ queryKey: ['my-projects'] });
-      router.push(`/dashboard/projects/${project.id}/edit`);
+      router.push(getDashboardProjectEditHref(project.id));
     },
     onError: (error) => logMutationError('save project', error),
   });
@@ -113,7 +114,7 @@ export function ProjectFormClient({ initialProject }: { initialProject?: Project
     },
     onSuccess: (project) => {
       void queryClient.invalidateQueries({ queryKey: ['my-projects'] });
-      router.push(`/dashboard/projects/${project.id}/edit`);
+      router.push(getDashboardProjectEditHref(project.id));
     },
     onError: (error) => logMutationError('publish project', error),
   });

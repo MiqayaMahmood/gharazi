@@ -33,6 +33,13 @@ export class ListingsController {
     return this.listingsService.listMine(user.id);
   }
 
+  @Get('me/:id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  mineOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.listingsService.getMine(user.id, id);
+  }
+
   @Patch(':id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
@@ -51,14 +58,42 @@ export class ListingsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   archive(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.listingsService.archive(user.id, id);
+    return this.listingsService.archive(user, id);
   }
 
   @Post(':id/refresh')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   refresh(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.listingsService.refresh(user.id, id);
+    return this.listingsService.refresh(user, id);
+  }
+
+  @Post(':id/mark-sold')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  markSold(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.listingsService.markStatus(user, id, 'sold');
+  }
+
+  @Post(':id/mark-rented')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  markRented(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.listingsService.markStatus(user, id, 'rented');
+  }
+
+  @Get(':id/owner-summary')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  ownerSummary(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.listingsService.ownerSummary(user, id);
+  }
+
+  @Get(':id/viewer-context')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  viewerContext(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.listingsService.viewerContext(user, id);
   }
 
   @Post(':id/media')
@@ -70,6 +105,13 @@ export class ListingsController {
     @Body() dto: AddListingMediaDto,
   ) {
     return this.listingsService.addMedia(user.id, id, dto);
+  }
+
+  @Get(':id/contact')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  contact(@Param('id') id: string) {
+    return this.listingsService.getContact(id);
   }
 
   @Get(':publicId')

@@ -24,7 +24,7 @@ describe('search query DTOs', () => {
 
   it('accepts listing code and slug query params separately from UUID fields', async () => {
     const dto = plainToInstance(SearchListingsQueryDto, {
-      purposeCode: 'sale',
+      purposeSlug: 'sale',
       propertyTypeCode: 'commercial',
       citySlug: 'lahore',
       areaSlug: 'dha-phase-6-lahore',

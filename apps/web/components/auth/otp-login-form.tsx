@@ -19,7 +19,7 @@ export function OtpLoginForm() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get('next') ?? '/';
+  const next = searchParams.get('returnTo') ?? searchParams.get('next') ?? '/';
   const phoneForm = useForm<z.infer<typeof phoneSchema>>({ resolver: zodResolver(phoneSchema), defaultValues: { phoneNumber: '' } });
   const otpForm = useForm<z.infer<typeof otpSchema>>({ resolver: zodResolver(otpSchema), defaultValues: { code: '' } });
   const requestMutation = useMutation({ mutationFn: requestOtp, onSuccess: (_, value) => { setPhoneNumber(value); setStep('otp'); } });

@@ -13,6 +13,7 @@ const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(3001),
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(5),
   DATABASE_URL: z.string().url(),
+  DIRECT_URL: optionalUrl,
   REDIS_URL: z.string().url(),
   ELASTICSEARCH_URL: z.string().url().default('http://localhost:9200'),
   ELASTICSEARCH_NODE: z.string().url().optional(),

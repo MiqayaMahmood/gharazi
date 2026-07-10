@@ -31,10 +31,10 @@ export function FavoriteButton({
   const favorites = useFavorites(Boolean(user));
   const serverSaved = favorites.data?.some((favorite) => favorite.entityType === entityType && favorite.entityId === entityId) ?? false;
   const isSaved = optimisticSaved ?? serverSaved;
+  const returnTo = typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}` : pathname;
   const mutation = useMutation<unknown, Error>({
     mutationFn: () => {
       setErrorText('');
-      if (!user && !isLoading) throw new Error('Login required');
       return isSaved ? removeFavorite(entityType, entityId) : addFavorite(entityType, entityId);
     },
     onMutate: () => setOptimisticSaved(!isSaved),
@@ -44,14 +44,21 @@ export function FavoriteButton({
     },
     onError: (error) => {
       setOptimisticSaved(null);
-      if (error.message === 'Login required') router.push(`/login?next=${encodeURIComponent(pathname)}`);
-      else setErrorText(getUserFriendlyErrorMessage(error));
+      setErrorText(getUserFriendlyErrorMessage(error));
     },
   });
 
+  function handleClick() {
+    if (!user && !isLoading) {
+      router.push(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+    mutation.mutate();
+  }
+
   return (
     <div className="grid gap-1">
-      <Button variant={isSaved ? 'primary' : 'secondary'} onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+      <Button variant={isSaved ? 'primary' : 'secondary'} onClick={handleClick} disabled={mutation.isPending || isLoading}>
         {isSaved ? savedLabel : label}
       </Button>
       {errorText ? <p className="text-xs font-semibold text-red-700">{errorText}</p> : null}

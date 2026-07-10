@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import { Badge, InfoChip } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -6,14 +7,17 @@ import { formatPrice } from '@/lib/utils';
 import type { Project } from '@/types/marketplace';
 import { FavoriteButton } from '@/components/favorites/favorite-button';
 import { CompareButton } from '@/components/compare/compare-button';
+import { getProjectHref } from '@/lib/routes';
 
 export function ProjectCard({ project }: { project: Project }) {
+  const detailsHref = getProjectHref(project);
+
   return (
     <Card className="overflow-hidden border-sky/20">
-      <div className="relative aspect-[16/10] bg-stone-200">
+      <Link href={detailsHref} aria-label={`View project details for ${project.name}`} className="relative block aspect-[16/10] bg-stone-200">
         {project.coverImageUrl ? <Image src={project.coverImageUrl} alt="" fill className="object-cover" sizes="(min-width: 768px) 33vw, 100vw" /> : null}
         {project.legalStatus ? <Badge className="absolute left-3 top-3 bg-sky-50 text-sky">{project.legalStatus}</Badge> : null}
-      </div>
+      </Link>
       <div className="grid gap-3 p-4">
         <div>
           <h2 className="text-lg font-black">{project.name}</h2>
@@ -27,7 +31,7 @@ export function ProjectCard({ project }: { project: Project }) {
         </div>
         <p className="text-sm text-muted">{project.paymentPlanSummary ?? 'Payment plan details available on request.'}</p>
         <div className="flex gap-2">
-          <Button href={`/project/${project.slug}`} asChild className="flex-1">View project</Button>
+          <Button href={detailsHref} asChild className="flex-1">View project</Button>
           <FavoriteButton entityType="project" entityId={project.id} />
         </div>
         <CompareButton type="project" id={project.id} />

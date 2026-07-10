@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { Listing, Project } from '@/types/marketplace';
+import type { Listing, OwnerSummary, Project, ViewerContext } from '@/types/marketplace';
 
 export type ListingFormPayload = {
   purposeId: string;
@@ -13,6 +13,8 @@ export type ListingFormPayload = {
   areaUnit: string;
   bedrooms?: number;
   bathrooms?: number;
+  floorNumber?: number;
+  totalFloors?: number;
   furnishedStatus?: string;
   possessionStatus?: string;
   addressLine?: string;
@@ -41,6 +43,7 @@ export type ProjectFormPayload = {
 };
 
 export type MediaPayload = {
+  id?: string;
   mediaType: string;
   storageKey: string;
   url: string;
@@ -81,6 +84,10 @@ export function createListing(payload: ListingFormPayload) {
   return apiRequest<Listing>('/listings', { method: 'POST', body: JSON.stringify(payload) });
 }
 
+export function getMyListing(id: string) {
+  return apiRequest<Listing>(`/listings/me/${id}`);
+}
+
 export function updateListing(id: string, payload: Partial<ListingFormPayload>) {
   return apiRequest<Listing>(`/listings/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
 }
@@ -91,6 +98,26 @@ export function publishListing(id: string) {
 
 export function archiveListing(id: string) {
   return apiRequest<Listing>(`/listings/${id}/archive`, { method: 'POST' });
+}
+
+export function refreshListing(id: string) {
+  return apiRequest<Listing>(`/listings/${id}/refresh`, { method: 'POST' });
+}
+
+export function markListingSold(id: string) {
+  return apiRequest<Listing>(`/listings/${id}/mark-sold`, { method: 'POST' });
+}
+
+export function markListingRented(id: string) {
+  return apiRequest<Listing>(`/listings/${id}/mark-rented`, { method: 'POST' });
+}
+
+export function getListingViewerContext(id: string) {
+  return apiRequest<ViewerContext>(`/listings/${id}/viewer-context`);
+}
+
+export function getListingOwnerSummary(id: string) {
+  return apiRequest<OwnerSummary>(`/listings/${id}/owner-summary`);
 }
 
 export function addListingMedia(id: string, payload: MediaPayload) {
@@ -111,6 +138,14 @@ export function publishProject(id: string) {
 
 export function archiveProject(id: string) {
   return apiRequest<Project>(`/projects/${id}/archive`, { method: 'POST' });
+}
+
+export function getProjectViewerContext(id: string) {
+  return apiRequest<ViewerContext>(`/projects/${id}/viewer-context`);
+}
+
+export function getProjectOwnerSummary(id: string) {
+  return apiRequest<OwnerSummary>(`/projects/${id}/owner-summary`);
 }
 
 export function addProjectMedia(id: string, payload: MediaPayload) {

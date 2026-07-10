@@ -20,6 +20,7 @@ export class SearchService {
     if (!this.searchEnabled()) return this.searchListingsWithDbFallback(query, 'Search is disabled; using PostgreSQL fallback.');
     try {
       const filters = this.listingFilters(query);
+      console.log("searchListings: ", filters);
       const sort = this.sort(query.sort, { price: 'priceAmount', area: 'areaValue' });
       const response = await this.elasticsearch.search('listings', {
         from: ((query.page ?? 1) - 1) * (query.limit ?? 20),
@@ -31,7 +32,7 @@ export class SearchService {
           propertyTypes: { terms: { field: 'propertyTypeId', size: 20 } },
           propertyTypeCodes: { terms: { field: 'propertyTypeCode', size: 20 } },
           purposes: { terms: { field: 'purposeId', size: 10 } },
-          purposeCodes: { terms: { field: 'purposeCode', size: 10 } },
+          purposeSlug: { terms: { field: 'slug', size: 10 } },
           priceRanges: { range: { field: 'priceAmount', ranges: [{ to: 5000000 }, { from: 5000000, to: 20000000 }, { from: 20000000 }] } },
         },
       });
@@ -85,23 +86,21 @@ export class SearchService {
   }
 
   async similarListings(id: string) {
-    if (!this.searchEnabled()) return this.similarListingsWithDbFallback(id);
+    const base = await this.findBaseListing(id);
+    if (!base) return [];
+    if (!this.searchEnabled()) return this.similarListingsWithDbFallback(base);
     try {
       const response = await this.elasticsearch.search('listings', {
-        size: 8,
-        query: {
-          more_like_this: {
-            fields: ['title', 'description', 'cityName', 'areaName', 'propertyTypeCode'],
-            like: [{ _index: this.elasticsearch.alias('listings'), _id: id }],
-            min_term_freq: 1,
-            min_doc_freq: 1,
-          },
-        },
+        size: 6,
+        query: this.similarListingQuery(base),
+        sort: [{ isFeatured: 'desc' }, { isHot: 'desc' }, { lastRefreshedAt: 'desc' }, { publishedAt: 'desc' }],
       });
-      return this.format(response).items;
+      const items = this.format(response).items.filter((item: any) => item.id !== base.id && item.publicId !== base.publicId);
+      if (items.length) return items;
+      return this.similarListingsWithDbFallback(base);
     } catch {
       this.warnDegraded('similar-listings', 'Elasticsearch similar listings degraded; using PostgreSQL fallback.');
-      return this.similarListingsWithDbFallback(id);
+      return this.similarListingsWithDbFallback(base);
     }
   }
 
@@ -142,7 +141,7 @@ export class SearchService {
     this.term(filter, 'areaId', query.areaId);
     this.term(filter, 'areaSlug', query.areaSlug);
     this.term(filter, 'purposeId', query.purposeId);
-    this.term(filter, 'purposeCode', this.listingPurposeCode(query));
+    this.term(filter, 'purposeSlug', this.listingPurposeSlug(query));
     this.term(filter, 'propertyTypeId', query.propertyTypeId);
     this.term(filter, 'propertyTypeCode', query.propertyTypeCode);
     this.term(filter, 'bedrooms', query.bedrooms);
@@ -174,9 +173,17 @@ export class SearchService {
     if (value !== undefined && value !== null && value !== '') filter.push({ term: { [field]: value } });
   }
 
-  private listingPurposeCode(query: SearchListingsQueryDto) {
-    const value = query.purposeCode ?? query.purpose;
+  private listingPurposeSlug(query: SearchListingsQueryDto) {
+    console.log("query.purposeSlug: ", query.purposeSlug);
+
+    const value = query.purposeSlug ?? query.purpose;
     if (value === 'buy') return 'sale';
+    if (value === 'Buy') return 'sale';
+    if (value === 'FOR_SALE') return 'sale';
+    if (value === 'Sale') return 'sale';
+    if (value === 'FOR_RENT') return 'rent';
+    if (value === 'Rent') return 'rent';
+    if (value === 'rent') return 'rent';
     return value;
   }
 
@@ -234,7 +241,7 @@ export class SearchService {
       ...(query.areaId ? { areaId: query.areaId } : {}),
       ...(query.areaSlug ? { area: { slug: query.areaSlug } } : {}),
       ...(query.purposeId ? { purposeId: query.purposeId } : {}),
-      ...(this.listingPurposeCode(query) ? { purpose: { code: this.listingPurposeCode(query) } } : {}),
+      ...(this.listingPurposeSlug(query) ? { purpose: { code: this.listingPurposeSlug(query) } } : {}),
       ...(query.propertyTypeId ? { propertyTypeId: query.propertyTypeId } : {}),
       ...(query.propertyTypeCode ? { propertyType: { code: query.propertyTypeCode } } : {}),
       ...(query.bedrooms !== undefined ? { bedrooms: query.bedrooms } : {}),
@@ -278,9 +285,11 @@ export class SearchService {
         description: listing.description,
         priceAmount: Number(listing.priceAmount),
         cityName: listing.city.name,
+        citySlug: listing.city.slug,
         areaName: listing.area.name,
+        areaSlug: listing.area.slug,
         propertyTypeName: listing.propertyType.name,
-        purposeName: listing.purpose.name,
+        purposeSlug: listing.purpose.slug,
         bedrooms: listing.bedrooms ?? undefined,
         bathrooms: listing.bathrooms ?? undefined,
         areaValue: Number(listing.areaValue),
@@ -288,6 +297,7 @@ export class SearchService {
         coverImageUrl: listing.media[0]?.url,
         verificationStatus: listing.verificationStatus,
         isFeatured: listing.isFeatured,
+        isHot: listing.isHot,
         updatedAt: listing.updatedAt.toISOString(),
         publishedAt: listing.publishedAt?.toISOString(),
         amenities: listing.amenities.map((item) => item.amenity.name),
@@ -355,7 +365,9 @@ export class SearchService {
         description: project.description,
         developerName: project.developer.companyName,
         cityName: project.city.name,
+        citySlug: project.city.slug,
         areaName: project.area.name,
+        areaSlug: project.area.slug,
         projectTypeName: project.projectType.name,
         possessionStatus: project.possessionStatus,
         legalStatus: project.legalStatus ?? undefined,
@@ -382,28 +394,45 @@ export class SearchService {
     };
   }
 
-  private async similarListingsWithDbFallback(id: string) {
-    if (!this.dbFallbackEnabled()) throw new ServiceUnavailableException('Search service unavailable');
-    const base = await this.prisma.listing.findFirst({
+  private async findBaseListing(id: string) {
+    return this.prisma.listing.findFirst({
       where: { OR: [{ id }, { publicId: id }], deletedAt: null },
-      select: { id: true, cityId: true, areaId: true, propertyTypeId: true, purposeId: true },
+      select: {
+        id: true,
+        publicId: true,
+        cityId: true,
+        areaId: true,
+        propertyTypeId: true,
+        purposeId: true,
+        priceAmount: true,
+        areaValue: true,
+      },
     });
-    if (!base) return [];
+  }
 
+  private async similarListingsWithDbFallback(baseOrId: any) {
+    if (!this.dbFallbackEnabled()) return [];
+    const base = typeof baseOrId === 'string' ? await this.findBaseListing(baseOrId) : baseOrId;
+    if (!base) return [];
     const strict = await this.findSimilarListings(base, true);
     if (strict.length) return strict.map((listing) => this.mapListing(listing));
     const relaxed = await this.findSimilarListings(base, false);
     return relaxed.map((listing) => this.mapListing(listing));
   }
 
-  private async findSimilarListings(base: { id: string; cityId: string; areaId: string; propertyTypeId: string; purposeId: string }, strict: boolean) {
+  private async findSimilarListings(base: { id: string; cityId: string; areaId: string; propertyTypeId: string; purposeId: string; priceAmount?: unknown; areaValue?: unknown }, strict: boolean) {
+    const priceRange = this.percentRange(base.priceAmount, 0.25);
+    const areaRange = this.percentRange(base.areaValue, 0.25);
     return this.prisma.listing.findMany({
       where: {
         id: { not: base.id },
         status: 'active',
         deletedAt: null,
         cityId: base.cityId,
-        ...(strict ? { areaId: base.areaId, propertyTypeId: base.propertyTypeId, purposeId: base.purposeId } : {}),
+        purposeId: base.purposeId,
+        ...(strict ? { areaId: base.areaId, propertyTypeId: base.propertyTypeId } : {}),
+        ...(priceRange ? { priceAmount: { gte: priceRange.gte, lte: priceRange.lte } } : {}),
+        ...(areaRange ? { areaValue: { gte: areaRange.gte, lte: areaRange.lte } } : {}),
       },
       include: {
         city: true,
@@ -413,13 +442,13 @@ export class SearchService {
         media: { orderBy: [{ isCover: 'desc' }, { sortOrder: 'asc' }], take: 1 },
         amenities: { include: { amenity: true } },
       },
-      orderBy: [{ isFeatured: 'desc' }, { lastRefreshedAt: 'desc' }, { publishedAt: 'desc' }],
-      take: 8,
+      orderBy: [{ isFeatured: 'desc' }, { isHot: 'desc' }, { lastRefreshedAt: 'desc' }, { publishedAt: 'desc' }],
+      take: 6,
     });
   }
 
   private async similarProjectsWithDbFallback(id: string) {
-    if (!this.dbFallbackEnabled()) throw new ServiceUnavailableException('Search service unavailable');
+    if (!this.dbFallbackEnabled()) return [];
     const base = await this.prisma.project.findFirst({
       where: { OR: [{ id }, { slug: id }, { publicId: id }], deletedAt: null },
       select: { id: true, developerId: true, cityId: true, projectTypeId: true },
@@ -506,12 +535,14 @@ export class SearchService {
       priceAmount: Number(listing.priceAmount),
       cityId: listing.cityId,
       cityName: listing.city.name,
+      citySlug: listing.city.slug,
       areaId: listing.areaId,
       areaName: listing.area.name,
+      areaSlug: listing.area.slug,
       propertyTypeId: listing.propertyTypeId,
       propertyTypeName: listing.propertyType.name,
       purposeId: listing.purposeId,
-      purposeName: listing.purpose.name,
+      purposeSlug: listing.purpose.slug,
       bedrooms: listing.bedrooms ?? undefined,
       bathrooms: listing.bathrooms ?? undefined,
       areaValue: Number(listing.areaValue),
@@ -519,6 +550,7 @@ export class SearchService {
       coverImageUrl: listing.media[0]?.url,
       verificationStatus: listing.verificationStatus,
       isFeatured: listing.isFeatured,
+      isHot: listing.isHot,
       updatedAt: listing.updatedAt.toISOString(),
       publishedAt: listing.publishedAt?.toISOString(),
       amenities: listing.amenities.map((item: any) => item.amenity.name),
@@ -534,7 +566,9 @@ export class SearchService {
       description: project.description,
       developerName: project.developer.companyName,
       cityName: project.city.name,
+      citySlug: project.city.slug,
       areaName: project.area.name,
+      areaSlug: project.area.slug,
       projectTypeName: project.projectType.name,
       possessionStatus: project.possessionStatus,
       legalStatus: project.legalStatus ?? undefined,
@@ -558,8 +592,60 @@ export class SearchService {
   private format(response: any) {
     return {
       total: typeof response.hits.total === 'number' ? response.hits.total : response.hits.total?.value ?? 0,
-      items: response.hits.hits.map((hit: any) => ({ id: hit._id, score: hit._score, ...hit._source })),
+      items: response.hits.hits.map((hit: any) => this.stripSourceFields({ id: hit._id, score: hit._score, ...hit._source })),
       aggregations: response.aggregations ?? {},
     };
+  }
+
+  private stripSourceFields(input: Record<string, unknown>) {
+    const output = { ...input };
+    [
+      'source_listing_id',
+      'sourceListingId',
+      'provider_id',
+      'providerId',
+      'source_url',
+      'sourceUrl',
+      'external_id',
+      'externalId',
+      'source_id',
+      'sourceId',
+      'imported_from',
+      'importedFrom',
+      'provider',
+      'scraper_source',
+      'scraperSource',
+    ].forEach((key) => delete output[key]);
+    return output;
+  }
+
+  private similarListingQuery(base: { id: string; publicId?: string; cityId: string; areaId: string; propertyTypeId: string; purposeId: string; priceAmount?: unknown; areaValue?: unknown }) {
+    const filter: unknown[] = [
+      { term: { status: 'active' } },
+      { term: { purposeId: base.purposeId } },
+      { term: { cityId: base.cityId } },
+    ];
+    const priceRange = this.percentRange(base.priceAmount, 0.25);
+    const areaRange = this.percentRange(base.areaValue, 0.25);
+    if (priceRange) filter.push({ range: { priceAmount: priceRange } });
+    if (areaRange) filter.push({ range: { areaValue: areaRange } });
+
+    return {
+      bool: {
+        filter,
+        must_not: [{ ids: { values: [base.id, base.publicId].filter(Boolean) } }],
+        should: [
+          { term: { areaId: { value: base.areaId, boost: 3 } } },
+          { term: { propertyTypeId: { value: base.propertyTypeId, boost: 2 } } },
+        ],
+      },
+    };
+  }
+
+  private percentRange(value: unknown, ratio: number) {
+    if (value === undefined || value === null) return undefined;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) return undefined;
+    return { gte: numeric * (1 - ratio), lte: numeric * (1 + ratio) };
   }
 }

@@ -9,6 +9,7 @@ import type { BlogPost } from '@/types/cms';
 import type { Listing, Project } from '@/types/marketplace';
 import type { SearchLandingContext } from '@/lib/search/search-context';
 import { searchLandingSubtitle, searchLandingTitle } from '@/lib/search/search-context';
+import { getAreaHref, getCityBuyHref, getCityRentHref, getProjectsCityHref } from '@/lib/routes';
 
 export function SearchLandingIntro({ context }: { context: SearchLandingContext }) {
   return (
@@ -29,8 +30,8 @@ export function QuickSearchChips({ context }: { context: SearchLandingContext })
     ? [
       ['Ready for possession', '/projects?possessionStatus=ready'],
       ['Installment plans', '/projects?q=installment'],
-      ['Lahore projects', '/projects/lahore'],
-      ['Karachi projects', '/projects/karachi'],
+      ['Lahore projects', getProjectsCityHref('lahore')],
+      ['Karachi projects', getProjectsCityHref('karachi')],
       ['Compare projects', '/compare/projects'],
     ]
     : context.purpose === 'rent'
@@ -90,17 +91,17 @@ export function RecommendedProjectsSection({ title, projects }: { title: string;
 export function SuggestedAreasSection({ context }: { context: SearchLandingContext }) {
   const city = context.citySlug ?? 'lahore';
   const links = [
-    ['DHA Lahore', '/area/dha-phase-6-lahore'],
-    ['Clifton Karachi', '/area/clifton-karachi'],
-    ['Gulberg Lahore', '/buy/gulberg-lahore'],
-    ['Islamabad projects', '/projects/islamabad'],
+    ['DHA Phase 6 Lahore', getAreaHref('dha-phase-6-lahore')],
+    ['Clifton Karachi', getAreaHref('clifton-karachi')],
+    ['Gulberg Lahore', getAreaHref('gulberg-lahore')],
+    ['Islamabad projects', getProjectsCityHref('islamabad')],
   ];
   return (
     <section className="mt-10">
       <h2 className="text-2xl font-black">Popular locations and related searches</h2>
       <div className="mt-4 grid gap-3 md:grid-cols-4">
         {links.map(([label, href]) => <Link key={label} href={href}><Card className="p-4 font-bold transition hover:border-trust">{label}</Card></Link>)}
-        <Link href={`/${context.purpose === 'rent' ? 'rent' : 'buy'}/${city}`}><Card className="p-4 font-bold transition hover:border-trust">More in {context.cityName ?? 'Lahore'}</Card></Link>
+        <Link href={context.purpose === 'project' ? getProjectsCityHref(city) : context.purpose === 'rent' ? getCityRentHref(city) : getCityBuyHref(city)}><Card className="p-4 font-bold transition hover:border-trust">More in {context.cityName ?? 'Lahore'}</Card></Link>
       </div>
     </section>
   );

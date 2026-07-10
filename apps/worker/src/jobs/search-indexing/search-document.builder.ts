@@ -41,7 +41,7 @@ export class SearchDocumentBuilder implements OnModuleDestroy {
       areaName: listing.area.name,
       areaSlug: listing.area.slug,
       purposeId: listing.purposeId,
-      purposeCode: listing.purpose.code,
+      purposeSlug: listing.purpose.slug,
       purposeName: listing.purpose.name,
       propertyTypeId: listing.propertyTypeId,
       propertyTypeCode: listing.propertyType.code,

@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+import { Prisma } from '@prisma/client';
 import { SearchIndexingService } from '../../common/queues/search-indexing.service';
 import { ElasticsearchService } from '../../common/elasticsearch/elasticsearch.service';
 import { PrismaService } from '../../database/prisma.service';
@@ -13,6 +14,7 @@ import { AnalyticsService } from '../analytics/analytics.service';
 import { RollupDto } from './dto/rollup.dto';
 import { PaymentsService } from '../payments/payments.service';
 import { AdminRoleDto, CreateAdminUserDto } from './dto/admin-users.dto';
+import { ListingContactUpdatesQueryDto, UpdateListingContactDto } from './dto/listing-contact-update.dto';
 
 @Injectable()
 export class AdminOperationsService {
@@ -259,6 +261,86 @@ export class AdminOperationsService {
     });
   }
 
+  async listingContactUpdates(query: ListingContactUpdatesQueryDto = {}) {
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(Math.max(1, query.limit ?? 20), 1000);
+    const where: Prisma.ListingWhereInput = {
+      deletedAt: null,
+      ...(query.filter === 'missing'
+        ? {
+            OR: [
+              { contactName: null },
+              { contactName: '' },
+              { contactPhone: null },
+              { contactPhone: '' },
+              { contactWhatsapp: null },
+              { contactWhatsapp: '' },
+            ],
+          }
+        : {}),
+    };
+    const search = query.q?.trim();
+    if (search) {
+      const q: Prisma.ListingWhereInput = {
+        OR: [
+          { publicId: { contains: search, mode: 'insensitive' } },
+          { title: { contains: search, mode: 'insensitive' } },
+          { contactName: { contains: search, mode: 'insensitive' } },
+          { contactPhone: { contains: search, mode: 'insensitive' } },
+          { contactWhatsapp: { contains: search, mode: 'insensitive' } },
+          { city: { name: { contains: search, mode: 'insensitive' } } },
+          { area: { name: { contains: search, mode: 'insensitive' } } },
+        ],
+      };
+      where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), q];
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.listing.findMany({
+        where,
+        select: this.listingContactSelect(),
+        orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.listing.count({ where }),
+    ]);
+
+    return {
+      items: items.map((listing) => this.mapListingContactUpdate(listing)),
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
+  }
+
+  async updateListingContact(actorUserId: string, id: string, dto: UpdateListingContactDto) {
+    const data: Prisma.ListingUpdateInput = {};
+    if (Object.prototype.hasOwnProperty.call(dto, 'contactName')) data.contactName = this.nullableTrim(dto.contactName);
+    if (Object.prototype.hasOwnProperty.call(dto, 'contactPhone')) data.contactPhone = this.normalizeContactNumber(dto.contactPhone, 'contactPhone');
+    if (Object.prototype.hasOwnProperty.call(dto, 'contactWhatsapp')) data.contactWhatsapp = this.normalizeContactNumber(dto.contactWhatsapp, 'contactWhatsapp');
+
+    const updated = await this.prisma.listing.update({
+      where: { id },
+      data,
+      select: this.listingContactSelect(),
+    });
+
+    await this.audit.record({
+      actorUserId,
+      action: 'listing.contact_update',
+      entityType: 'listing',
+      entityId: id,
+      metadataJson: {
+        fields: Object.keys(data),
+        publicId: updated.publicId,
+      },
+    });
+
+    return this.mapListingContactUpdate(updated);
+  }
+
   projects(filters: { status?: string }) {
     return this.prisma.project.findMany({
       where: { status: filters.status },
@@ -468,5 +550,52 @@ export class AdminOperationsService {
       const project = lookup.get(row.projectId);
       return project ? [{ ...project, viewsCount: row._sum.viewsCount ?? 0, savesCount: row._sum.savesCount ?? 0 }] : [];
     });
+  }
+
+  private listingContactSelect() {
+    return {
+      id: true,
+      publicId: true,
+      title: true,
+      status: true,
+      contactName: true,
+      contactPhone: true,
+      contactWhatsapp: true,
+      sourceUrl: true,
+      updatedAt: true,
+      city: { select: { name: true } },
+      area: { select: { name: true } },
+    } as const;
+  }
+
+  private mapListingContactUpdate(listing: Prisma.ListingGetPayload<{ select: ReturnType<AdminOperationsService['listingContactSelect']> }>) {
+    return {
+      id: listing.id,
+      publicId: listing.publicId,
+      title: listing.title,
+      cityName: listing.city?.name ?? null,
+      areaName: listing.area?.name ?? null,
+      status: listing.status,
+      contactName: listing.contactName,
+      contactPhone: listing.contactPhone,
+      contactWhatsapp: listing.contactWhatsapp,
+      sourceUrl: listing.sourceUrl,
+      updatedAt: listing.updatedAt,
+    };
+  }
+
+  private nullableTrim(value: string | null | undefined) {
+    if (value === null || value === undefined) return null;
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : null;
+  }
+
+  private normalizeContactNumber(value: string | null | undefined, field: string) {
+    const trimmed = this.nullableTrim(value);
+    if (trimmed === null) return null;
+    if (trimmed.length < 7 || trimmed.length > 32) {
+      throw new BadRequestException(`${field} must be between 7 and 32 characters`);
+    }
+    return trimmed;
   }
 }

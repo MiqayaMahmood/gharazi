@@ -54,7 +54,21 @@ export class ProjectsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   archive(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.projectsService.archive(user.id, id);
+    return this.projectsService.archive(user, id);
+  }
+
+  @Get(':id/owner-summary')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  ownerSummary(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.projectsService.ownerSummary(user, id);
+  }
+
+  @Get(':id/viewer-context')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  viewerContext(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.projectsService.viewerContext(user, id);
   }
 
   @Post(':id/units')

@@ -28,5 +28,5 @@ export class SearchProjectsQueryDto {
   @IsIn(['relevant', 'newest', 'price_low_high', 'price_high_low'])
   sort?: string = 'relevant';
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number = 1;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number = 20;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1000) limit?: number = 20;
 }

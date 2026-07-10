@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { AuthenticatedUser } from '@Gharazi/shared-types';
 import { makePublicId, slugify } from '@Gharazi/shared-utils';
 import { SearchIndexingService } from '../../common/queues/search-indexing.service';
 import { PrismaService } from '../../database/prisma.service';
@@ -125,20 +126,69 @@ export class ProjectsService {
     return updated;
   }
 
-  async archive(userId: string, id: string) {
-    const project = await this.assertCanWrite(userId, id);
+  async archive(user: AuthenticatedUser, id: string) {
+    const project = await this.assertCanManage(user, id);
     if (project.status === 'archived') {
       return project;
     }
 
     const updated = await this.prisma.project.update({
-      where: { id },
+      where: { id: project.id },
       data: { status: 'archived' },
       include: this.detailInclude(),
     });
     await this.indexing.deleteProject(updated.id, updated.publicId);
 
     return updated;
+  }
+
+  async viewerContext(user: AuthenticatedUser, id: string) {
+    const project = await this.prisma.project.findFirst({
+      where: { OR: [{ id }, { slug: id }, { publicId: id }], deletedAt: null },
+      select: { id: true, status: true, developer: { select: { ownerUserId: true } } },
+    });
+    if (!project) throw new NotFoundException('Project was not found');
+    const isOwner = project.developer.ownerUserId === user.id;
+    const admin = this.isAdminOrModerator(user);
+    const canManage = isOwner || admin;
+    return {
+      isOwner,
+      isManager: false,
+      isAdmin: admin,
+      canManage,
+      canContact: !canManage && project.status === 'active',
+      canFavorite: !canManage && project.status === 'active',
+      canEdit: canManage,
+      canArchive: canManage,
+      canRefresh: false,
+      canMarkSoldOrRented: false,
+    };
+  }
+
+  async ownerSummary(user: AuthenticatedUser, id: string) {
+    const project = await this.assertCanManage(user, id);
+    const [daily, favoritesCount, inquiriesCount, chatsCount, messagesCount] = await Promise.all([
+      this.prisma.projectDailyStat.aggregate({
+        where: { projectId: project.id },
+        _sum: { viewsCount: true, savesCount: true, inquiriesCount: true },
+      }),
+      this.prisma.favorite.count({ where: { entityType: 'project', entityId: project.id } }),
+      this.prisma.inquiry.count({ where: { projectId: project.id } }),
+      this.prisma.chat.count({ where: { projectId: project.id } }),
+      this.prisma.chatMessage.count({ where: { chat: { projectId: project.id } } }),
+    ]);
+    return {
+      projectId: project.id,
+      status: project.status,
+      views: daily._sum.viewsCount ?? 0,
+      favorites: daily._sum.savesCount ?? favoritesCount,
+      inquiries: daily._sum.inquiriesCount ?? inquiriesCount,
+      chats: chatsCount,
+      messages: messagesCount,
+      lastRefreshedAt: undefined,
+      publishedAt: project.publishedAt,
+      searchVisibility: project.status === 'active' ? 'Public search' : 'Not public',
+    };
   }
 
   async addUnit(userId: string, id: string, dto: AddProjectUnitDto) {
@@ -200,6 +250,24 @@ export class ProjectsService {
     }
 
     return project;
+  }
+
+  private async assertCanManage(user: AuthenticatedUser, id: string) {
+    const project = await this.prisma.project.findFirst({
+      where: {
+        OR: [{ id }, { slug: id }, { publicId: id }],
+        deletedAt: null,
+        ...(this.isAdminOrModerator(user) ? {} : { developer: { ownerUserId: user.id } }),
+      },
+    });
+    if (!project) {
+      throw new ForbiddenException('Project is not available for this user');
+    }
+    return project;
+  }
+
+  private isAdminOrModerator(user: Pick<AuthenticatedUser, 'roles'>) {
+    return (user.roles ?? []).some((role) => ['admin', 'moderator'].includes(role.toLowerCase()));
   }
 
   private async getDeveloperForUser(userId: string) {

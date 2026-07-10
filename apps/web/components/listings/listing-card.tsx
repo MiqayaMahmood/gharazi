@@ -7,14 +7,18 @@ import { formatDate, formatPrice } from '@/lib/utils';
 import type { Listing } from '@/types/marketplace';
 import { FavoriteButton } from '@/components/favorites/favorite-button';
 import { CompareButton } from '@/components/compare/compare-button';
+import { AuthActionLink } from '@/components/auth/auth-action-link';
+import { getListingHref } from '@/lib/routes';
 
 export function ListingCard({ listing }: { listing: Listing }) {
+  const detailsHref = getListingHref(listing);
+
   return (
     <Card className="overflow-hidden">
-      <div className="relative aspect-[4/3] bg-stone-200">
+      <Link href={detailsHref} aria-label={`View details for ${listing.title}`} className="relative block aspect-[4/3] bg-stone-200">
         {listing.coverImageUrl ? <Image src={listing.coverImageUrl} alt="" fill className="object-cover" sizes="(min-width: 768px) 33vw, 100vw" /> : null}
         {listing.verificationStatus === 'verified' ? <Badge className="absolute left-3 top-3">Verified</Badge> : null}
-      </div>
+      </Link>
       <div className="grid gap-3 p-4">
         <div>
           <p className="text-lg font-black text-ink">{formatPrice(listing.priceAmount)}</p>
@@ -28,11 +32,17 @@ export function ListingCard({ listing }: { listing: Listing }) {
           <InfoChip>{formatDate(listing.updatedAt)}</InfoChip>
         </div>
         <div className="flex gap-2">
-          <Button href={`/listing/${listing.publicId}`} asChild className="flex-1">View details</Button>
+          <Button href={detailsHref} asChild className="flex-1">View details</Button>
           <FavoriteButton entityType="listing" entityId={listing.id} />
         </div>
         <CompareButton type="listing" id={listing.id} />
-        <Link href={`/listing/${listing.publicId}#inquiry`} className="text-sm font-bold text-trust">Chat / inquire</Link>
+        <AuthActionLink
+          href={`${detailsHref}#inquiry`}
+          className="text-left text-sm font-bold text-trust disabled:cursor-not-allowed disabled:opacity-60"
+          ariaLabel={`Chat or inquire about ${listing.title}`}
+        >
+          Chat / inquire
+        </AuthActionLink>
       </div>
     </Card>
   );

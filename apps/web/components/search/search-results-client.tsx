@@ -26,11 +26,16 @@ import {
 } from '@/components/search/search-landing-content';
 import { ListingLandingRecommendations } from '@/components/search/search-landing-client-sections';
 import { categoryForPropertyType } from '@/lib/search/search-context';
+import { Breadcrumbs } from '@/components/navigation/breadcrumbs';
+
+const defaultLimit = 20;
 
 export function ListingSearchClient({ purpose }: { purpose: 'buy' | 'rent' }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const page = positiveInt(searchParams.get('page'), 1);
+  const limit = positiveInt(searchParams.get('limit'), defaultLimit);
   const [filters, setFilters] = useState<FilterValues>({
     ...defaultFilters,
     q: searchParams.get('q') ?? '',
@@ -58,7 +63,7 @@ export function ListingSearchClient({ purpose }: { purpose: 'buy' | 'rent' }) {
     const propertyTypeValue = applied.propertyTypeId;
     const propertyTypeIsId = propertyTypeValue ? isUuid(propertyTypeValue) : false;
     return {
-    purposeCode: purpose === 'buy' ? 'sale' : purpose,
+    purposeSlug: purpose === 'buy' ? 'sale' : purpose,
     q: applied.q || applied.location,
     cityId: applied.cityId || undefined,
     propertyTypeId: propertyTypeIsId ? propertyTypeValue : undefined,
@@ -72,9 +77,10 @@ export function ListingSearchClient({ purpose }: { purpose: 'buy' | 'rent' }) {
     furnishedStatus: applied.furnishedStatus || undefined,
     verifiedOnly: applied.verifiedOnly,
     sort: applied.sort,
-    page: 1,
+    page,
+    limit,
     };
-  }, [applied, purpose]);
+  }, [applied, limit, page, purpose]);
   const context = useMemo(() => ({
     purpose: purpose === 'rent' ? 'rent' as const : 'sale' as const,
     propertyTypeCode: applied.propertyTypeId && !isUuid(applied.propertyTypeId) ? applied.propertyTypeId : undefined,
@@ -91,22 +97,42 @@ export function ListingSearchClient({ purpose }: { purpose: 'buy' | 'rent' }) {
     onError: () => router.push(`/login?next=${encodeURIComponent(`/${purpose}`)}`),
   });
   const active = Object.entries(applied).filter(([, value]) => Boolean(value) && value !== 'relevant');
+  const resultTitle = context.propertyTypeName
+    ? `${context.propertyTypeName} for ${purpose === 'rent' ? 'Rent' : 'Sale'}`
+    : purpose === 'rent' ? 'Properties for Rent' : 'Properties for Sale';
 
   function apply(nextFilters = filters) {
     setApplied(nextFilters);
-    const queryString = filterQuery(nextFilters);
-    router.replace(`/${purpose}${queryString ? `?${queryString}` : ''}`, { scroll: false });
+    replaceQuery(nextFilters, 1, limit);
   }
 
   function clear() {
     setFilters(defaultFilters);
-    apply(defaultFilters);
+    setApplied(defaultFilters);
+    replaceQuery(defaultFilters, 1, limit);
+  }
+
+  function replaceQuery(nextFilters: FilterValues, nextPage: number, nextLimit: number) {
+    const params = new URLSearchParams(filterQuery(nextFilters));
+    if (nextPage > 1) params.set('page', String(nextPage));
+    if (nextLimit !== defaultLimit) params.set('limit', String(nextLimit));
+    const queryString = params.toString();
+    router.replace(`/${purpose}${queryString ? `?${queryString}` : ''}`, { scroll: false });
+  }
+
+  function changePage(nextPage: number) {
+    replaceQuery(applied, nextPage, limit);
+  }
+
+  function changeLimit(nextLimit: number) {
+    replaceQuery(applied, 1, nextLimit);
   }
 
   return (
     <>
       <GlobalSearchBar mode="controlled" initialTab={purpose} values={filters} onChange={setFilters} onSearch={() => apply()} />
       <div className="mx-auto max-w-7xl px-4 py-6">
+      <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: purpose === 'buy' ? 'Buy' : 'Rent' }]} />
       <div className="mb-5 grid gap-3">
         <SearchLandingIntro context={context} />
         <QuickSearchChips context={context} />
@@ -114,8 +140,8 @@ export function ListingSearchClient({ purpose }: { purpose: 'buy' | 'rent' }) {
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <Badge>{purpose === 'buy' ? 'Buy' : 'Rent'}</Badge>
-          <h1 className="mt-3 text-3xl font-black">{purpose === 'buy' ? 'Properties for sale' : 'Properties for rent'}</h1>
-          <p className="mt-1 text-muted">Verified inventory, fresh updates, and direct inquiry readiness.</p>
+          <h1 className="mt-3 text-3xl font-black">{resultTitle} in Pakistan</h1>
+          <p className="mt-1 text-muted">{query.data ? resultSummary(query.data.total, page, limit, 'properties') : 'Verified inventory, fresh updates, and direct inquiry readiness.'}</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={() => saveMutation.mutate()} variant="secondary">Save search</Button>
@@ -130,7 +156,7 @@ export function ListingSearchClient({ purpose }: { purpose: 'buy' | 'rent' }) {
       <section>
           {query.isLoading ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-80" />)}</div> : null}
           {query.isError ? <ErrorState title="Search failed" message="Try adjusting filters or reload the page." /> : null}
-          {query.data && query.data.items.length === 0 ? <EmptyState title="No listings found" message="Try clearing filters, broadening the area, or saving this search for future alerts." /> : null}
+          {query.data && query.data.items.length === 0 ? <EmptyState title={`No listings found for ${resultTitle}`} message="Try clearing filters, broadening the area, or saving this search for future alerts." /> : null}
           {query.data && view === 'map' ? (
             <MapPreview
               title="Listings map preview"
@@ -148,7 +174,7 @@ export function ListingSearchClient({ purpose }: { purpose: 'buy' | 'rent' }) {
               {query.data.items.map((listing) => <ListingCard key={listing.id} listing={listing} />)}
             </div>
           ) : null}
-          <div className="mt-8">{query.data ? <Pagination page={1} total={query.data.total} /> : null}</div>
+          <div className="mt-8">{query.data ? <Pagination page={page} total={query.data.total} pageSize={limit} onPageChange={changePage} onPageSizeChange={changeLimit} /> : null}</div>
       </section>
       <ListingLandingRecommendations context={context} />
       <SuggestedAreasSection context={context} />
@@ -166,4 +192,17 @@ export function ListingSearchClient({ purpose }: { purpose: 'buy' | 'rent' }) {
 
 function readable(value: string) {
   return value.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+}
+
+function positiveInt(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function resultSummary(total: number, page: number, limit: number, label: string) {
+  if (!total) return `No ${label} found for this search.`;
+  const start = (page - 1) * limit + 1;
+  const end = Math.min(total, page * limit);
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  return `Showing ${start}-${end} of ${total} ${label}. Page ${Math.min(page, totalPages)} of ${totalPages}.`;
 }

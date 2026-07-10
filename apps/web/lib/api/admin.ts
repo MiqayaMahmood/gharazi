@@ -12,6 +12,28 @@ export type AdminOverview = {
   [key: string]: unknown;
 };
 
+export type ListingContactUpdateRow = {
+  id: string;
+  publicId: string;
+  title: string;
+  cityName: string | null;
+  areaName: string | null;
+  status: string;
+  contactName: string | null;
+  contactPhone: string | null;
+  contactWhatsapp: string | null;
+  sourceUrl: string | null;
+  updatedAt: string;
+};
+
+export type ListingContactUpdatesResponse = {
+  items: ListingContactUpdateRow[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
 function normalizeList(response: AdminListResponse): AdminRecord[] {
   if (Array.isArray(response)) return response;
   return response.items ?? response.data ?? response.results ?? [];
@@ -47,6 +69,14 @@ export async function removeAdminUserRole(id: string, roleId: string) {
 
 export async function listAdminListings(status?: string) {
   return normalizeList(await apiRequest<AdminListResponse>(`/admin/listings${toQueryString({ status })}`));
+}
+
+export async function listAdminListingContactUpdates(filters: { filter?: 'all' | 'missing'; page?: number; limit?: number; q?: string }) {
+  return apiRequest<ListingContactUpdatesResponse>(`/admin/listing-contact-updates${toQueryString(filters)}`);
+}
+
+export async function updateAdminListingContact(id: string, input: { contactName?: string | null; contactPhone?: string | null; contactWhatsapp?: string | null }) {
+  return apiRequest<ListingContactUpdateRow>(`/admin/listing-contact-updates/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
 }
 
 export async function listAdminProjects(status?: string) {

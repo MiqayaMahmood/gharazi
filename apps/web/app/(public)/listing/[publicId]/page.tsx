@@ -1,20 +1,21 @@
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { Badge, InfoChip } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/state';
-import { InquiryPanel } from '@/components/inquiries/inquiry-panel';
 import { ListingCard } from '@/components/listings/listing-card';
-import { FavoriteButton } from '@/components/favorites/favorite-button';
+import { ListingGallery } from '@/components/listings/listing-gallery';
+import { ListingActionPanel } from '@/components/listings/listing-action-panel';
 import { CompareButton } from '@/components/compare/compare-button';
 import { RelatedGuides } from '@/components/content/blog-card';
 import { ViewTracker } from '@/components/analytics/view-tracker';
 import { GlobalSearchBar } from '@/components/search/global-search-bar';
+import { Breadcrumbs } from '@/components/navigation/breadcrumbs';
 import { ListingDisclaimer, SponsoredDisclaimer } from '@/components/legal/disclaimers';
 import { listLatestBlogPosts } from '@/lib/api/wordpress';
 import { getListing, getSimilarListings } from '@/lib/api/marketplace';
+import { getAreaHref, getCityBuyHref, getCityRentHref } from '@/lib/routes';
 import { formatDate, formatPrice } from '@/lib/utils';
 
 export async function generateMetadata({ params }: { params: Promise<{ publicId: string }> }): Promise<Metadata> {
@@ -33,17 +34,26 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
   if (!listing) notFound();
   const similarListings = await getSimilarListings(listing.id).catch(() => []);
   const displayedSimilarListings = similarListings.filter((item) => item.publicId !== listing.publicId).slice(0, 3);
+  const isRent = listing.purposeSlug?.toLowerCase().includes('rent');
+  const purposeLabel = isRent ? 'Rent' : 'Buy';
+  const cityHref = listing.citySlug ? (isRent ? getCityRentHref(listing.citySlug) : getCityBuyHref(listing.citySlug)) : isRent ? '/rent' : '/buy';
+  const areaHref = listing.areaSlug ? getAreaHref(listing.areaSlug) : undefined;
 
   return (
     <>
     <ViewTracker eventType="listing_viewed" entityType="listing" entityId={listing.id} metadataJson={{ publicId: listing.publicId }} />
-    <GlobalSearchBar initialTab="buy" compact />
+    <GlobalSearchBar initialTab={isRent ? 'rent' : 'buy'} compact />
     <div className="mx-auto max-w-7xl px-4 py-8">
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <Breadcrumbs items={[
+        { label: 'Home', href: '/' },
+        { label: purposeLabel, href: isRent ? '/rent' : '/buy' },
+        { label: listing.cityName, href: cityHref },
+        { label: listing.areaName, href: areaHref },
+        { label: listing.publicId },
+      ]} />
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
         <div className="grid gap-6">
-          <div className="relative aspect-[16/9] overflow-hidden rounded-xl bg-stone-200">
-            {listing.coverImageUrl ? <Image src={listing.coverImageUrl} alt="" fill className="object-cover" priority /> : null}
-          </div>
+          <ListingGallery images={listing.images} title={listing.title} />
           <section>
             <div className="flex flex-wrap gap-2">
               {listing.verificationStatus === 'verified' ? <Badge>Verified</Badge> : null}
@@ -52,8 +62,8 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
             </div>
             <h1 className="mt-4 text-3xl font-black">{listing.title}</h1>
             <p className="mt-2 text-2xl font-black text-trust">{formatPrice(listing.priceAmount)}</p>
-            <p className="mt-2 text-muted"><a className="font-semibold text-trust" href={`/area/${listing.areaName?.toLowerCase().replace(/\s+/g, '-')}-${listing.cityName?.toLowerCase()}`}>{listing.areaName}</a>, {listing.cityName}</p>
-            <div className="mt-4 flex flex-wrap gap-2"><FavoriteButton entityType="listing" entityId={listing.id} /><CompareButton type="listing" id={listing.id} /></div>
+            <p className="mt-2 text-muted">{areaHref ? <a className="font-semibold text-trust" href={areaHref}>{listing.areaName}</a> : listing.areaName}, {listing.cityName}</p>
+            <div className="mt-4 flex flex-wrap gap-2"><CompareButton type="listing" id={listing.id} /></div>
           </section>
           <ListingDisclaimer />
           <div className="grid gap-3 sm:grid-cols-4">
@@ -74,7 +84,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
           <Card className="p-5"><h2 className="text-xl font-black">Location</h2><div className="mt-3 flex h-52 items-center justify-center rounded-lg bg-stone-100 text-sm font-semibold text-muted">Map placeholder for {listing.areaName}</div></Card>
           <Card className="p-5"><h2 className="text-xl font-black">Lister</h2><p className="mt-2 font-bold">{listing.listerName}</p><p className="text-sm text-muted">{listing.listerRole}</p><p className="mt-3 text-xs text-muted">Listing ID: {listing.publicId}</p><Button className="mt-4" variant="secondary">Report listing</Button></Card>
           <section>
-            <h2 className="mb-4 text-xl font-black">Similar listings</h2>
+            <h2 className="mb-4 text-xl font-black">{displayedSimilarListings.some((item) => item.isFeatured) ? 'Featured similar listings' : 'Similar listings'}</h2>
             <SponsoredDisclaimer className="mb-4" />
             {displayedSimilarListings.length ? (
               <div className="grid gap-4 md:grid-cols-3">{displayedSimilarListings.map((item) => <ListingCard key={item.id} listing={item} />)}</div>
@@ -82,10 +92,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
           </section>
           <RelatedGuides posts={guides} />
         </div>
-        <InquiryPanel subject={listing.publicId} listingId={listing.id} />
-      </div>
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white p-3 shadow-soft lg:hidden">
-        <a className="flex min-h-11 items-center justify-center rounded-md bg-trust px-4 py-2 text-sm font-bold text-white" href="#inquiry">Chat / send inquiry</a>
+        <ListingActionPanel listing={listing} />
       </div>
     </div>
     </>

@@ -18,7 +18,7 @@ describe('SearchService query mapping', () => {
       query: expect.objectContaining({
         bool: expect.objectContaining({
           filter: expect.arrayContaining([
-            { term: { purposeCode: 'sale' } },
+            { term: { purposeSlug: 'sale' } },
             { term: { propertyTypeCode: 'commercial' } },
             { term: { citySlug: 'lahore' } },
             { term: { areaSlug: 'dha-phase-6-lahore' } },

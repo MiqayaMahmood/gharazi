@@ -270,6 +270,7 @@ export class AnalyticsService {
           cityName: listing.city.name,
           areaName: listing.area.name,
           propertyTypeName: listing.propertyType.name,
+          purposeSlug: listing.purpose.slug,
           purposeName: listing.purpose.name,
           bedrooms: listing.bedrooms ?? undefined,
           bathrooms: listing.bathrooms ?? undefined,

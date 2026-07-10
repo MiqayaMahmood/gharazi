@@ -3,13 +3,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { NewsletterSignupSection } from '@/components/newsletter/newsletter-signup-section';
+import { getAreaHref } from '@/lib/routes';
 
 const columns = [
-  { title: 'Explore', links: [['Buy', '/buy'], ['Rent', '/rent'], ['Projects', '/projects'], ['Areas', '/area/dha-phase-6-lahore'], ['Blog / Guides', '/blog']] },
+  { title: 'Explore', links: [['Buy', '/buy'], ['Rent', '/rent'], ['Projects', '/projects'], ['DHA Phase 6 Lahore', getAreaHref('dha-phase-6-lahore')], ['Blog / Guides', '/blog']] },
   { title: 'For Property Owners', links: [['Post Property', '/dashboard/listings/new'], ['Advertise with Gharazi', '/advertise'], ['Packages', '/advertise#packages'], ['My Listings', '/dashboard/listings']] },
   { title: 'Company', links: [['About', '/about'], ['Contact', '/contact'], ['Feedback', '/contact#feedback'], ['Support', '/contact#faq']] },
   { title: 'Legal & Trust', links: [['Terms', '/terms'], ['Privacy Policy', '/privacy-policy'], ['Disclaimer', '/disclaimer'], ['Anti-Spam Policy', '/anti-spam-policy'], ['Platform Neutrality', '/platform-neutrality'], ['Advertising Disclaimer', '/advertising-disclaimer'], ['Cookie Policy', '/cookie-policy']] },
-  { title: 'Tools', links: [['Compare Properties', '/compare/listings'], ['Compare Projects', '/compare/projects'], ['Area Guides', '/area/dha-phase-6-lahore'], ['Price Trends', '/blog'], ['Unit Converter', '/blog']] },
+  { title: 'Tools', links: [['Compare Properties', '/compare/listings'], ['Compare Projects', '/compare/projects'], ['Area Guides', getAreaHref('dha-phase-6-lahore')], ['Price Trends', '/blog'], ['Unit Converter', '/blog']] },
 ];
 
 const socials = [['Facebook', '#'], ['Instagram', '#'], ['LinkedIn', '#'], ['YouTube', '#']];

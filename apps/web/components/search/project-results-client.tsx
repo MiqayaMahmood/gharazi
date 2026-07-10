@@ -25,9 +25,14 @@ import {
   SuggestedAreasSection,
 } from '@/components/search/search-landing-content';
 import { ProjectLandingRecommendations } from '@/components/search/search-landing-client-sections';
+import { Breadcrumbs } from '@/components/navigation/breadcrumbs';
+
+const defaultLimit = 20;
 
 export function ProjectResultsClient() {
   const searchParams = useSearchParams();
+  const page = positiveInt(searchParams.get('page'), 1);
+  const limit = positiveInt(searchParams.get('limit'), defaultLimit);
   const [filters, setFilters] = useState<FilterValues>({
     ...defaultFilters,
     q: searchParams.get('q') ?? '',
@@ -66,9 +71,10 @@ export function ProjectResultsClient() {
     minPrice: Number(applied.minPrice) || undefined,
     maxPrice: Number(applied.maxPrice) || undefined,
     sort: applied.sort,
-    page: 1,
+    page,
+    limit,
     };
-  }, [applied]);
+  }, [applied, limit, page]);
   const context = useMemo(() => ({
     purpose: 'project' as const,
     propertyTypeCode: applied.propertyTypeId && !isUuid(applied.propertyTypeId) ? applied.propertyTypeId : undefined,
@@ -88,19 +94,36 @@ export function ProjectResultsClient() {
 
   function apply(nextFilters = filters) {
     setApplied(nextFilters);
-    const queryString = filterQuery(nextFilters, true);
-    router.replace(`/projects${queryString ? `?${queryString}` : ''}`, { scroll: false });
+    replaceQuery(nextFilters, 1, limit);
   }
 
   function clear() {
     setFilters(defaultFilters);
-    apply(defaultFilters);
+    setApplied(defaultFilters);
+    replaceQuery(defaultFilters, 1, limit);
+  }
+
+  function replaceQuery(nextFilters: FilterValues, nextPage: number, nextLimit: number) {
+    const params = new URLSearchParams(filterQuery(nextFilters, true));
+    if (nextPage > 1) params.set('page', String(nextPage));
+    if (nextLimit !== defaultLimit) params.set('limit', String(nextLimit));
+    const queryString = params.toString();
+    router.replace(`/projects${queryString ? `?${queryString}` : ''}`, { scroll: false });
+  }
+
+  function changePage(nextPage: number) {
+    replaceQuery(applied, nextPage, limit);
+  }
+
+  function changeLimit(nextLimit: number) {
+    replaceQuery(applied, 1, nextLimit);
   }
 
   return (
     <>
       <GlobalSearchBar mode="controlled" initialTab="projects" values={filters} onChange={setFilters} onSearch={() => apply()} />
       <div className="mx-auto max-w-7xl px-4 py-6">
+      <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Projects' }]} />
       <div className="mb-5 grid gap-3">
         <SearchLandingIntro context={context} />
         <QuickSearchChips context={context} />
@@ -108,8 +131,8 @@ export function ProjectResultsClient() {
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <Badge className="bg-sky-50 text-sky">New projects</Badge>
-          <h1 className="mt-3 text-3xl font-black">Transparent project discovery</h1>
-          <p className="mt-1 text-muted">Compare developers, payment plans, possession status, and legal signals.</p>
+          <h1 className="mt-3 text-3xl font-black">New Projects in Pakistan</h1>
+          <p className="mt-1 text-muted">{query.data ? resultSummary(query.data.total, page, limit, 'projects') : 'Compare developers, payment plans, possession status, and legal signals.'}</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={() => saveMutation.mutate()} variant="secondary">Save search</Button>
@@ -138,7 +161,7 @@ export function ProjectResultsClient() {
             />
           ) : null}
           {query.data && view === 'list' ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{query.data.items.map((project) => <ProjectCard key={project.id} project={project} />)}</div> : null}
-          <div className="mt-8">{query.data ? <Pagination page={1} total={query.data.total} /> : null}</div>
+          <div className="mt-8">{query.data ? <Pagination page={page} total={query.data.total} pageSize={limit} onPageChange={changePage} onPageSizeChange={changeLimit} /> : null}</div>
       </section>
       <ProjectLandingRecommendations context={context} />
       <SuggestedAreasSection context={context} />
@@ -156,4 +179,17 @@ export function ProjectResultsClient() {
 
 function readable(value: string) {
   return value.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+}
+
+function positiveInt(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function resultSummary(total: number, page: number, limit: number, label: string) {
+  if (!total) return `No ${label} found for this search.`;
+  const start = (page - 1) * limit + 1;
+  const end = Math.min(total, page * limit);
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  return `Showing ${start}-${end} of ${total} ${label}. Page ${Math.min(page, totalPages)} of ${totalPages}.`;
 }

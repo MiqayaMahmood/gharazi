@@ -4,8 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/state';
 import { mockAreas, mockPropertyTypes } from '@/lib/mock-data';
+import { Breadcrumbs } from '@/components/navigation/breadcrumbs';
 import type { BlogPost } from '@/types/cms';
 import { searchListings, searchProjects } from '@/lib/api/marketplace';
+import { getAreaHref, getBuyPropertyTypeCityHref, getCityBuyHref, getCityRentHref, getProjectsCityHref } from '@/lib/routes';
 import {
   ContextualGuidesSection,
   ContextualToolsSection,
@@ -48,7 +50,7 @@ export async function SeoDiscoveryPage({
   };
   const [listings, projects] = await Promise.all([
     purpose ? searchListings({
-      purposeCode: purpose === 'rent' ? 'rent' : 'sale',
+      purposeSlug: purpose === 'rent' ? 'rent' : 'sale',
       citySlug,
       propertyTypeCode,
       sort: 'newest',
@@ -56,9 +58,17 @@ export async function SeoDiscoveryPage({
     }).then((response) => response.items).catch(() => []) : Promise.resolve([]),
     searchProjects({ citySlug, sort: 'newest', limit: 3 }).then((response) => response.items).catch(() => []),
   ]);
+  const primaryHref = purpose === 'rent' ? '/rent' : purpose === 'buy' ? '/buy' : '/projects';
+  const cityHref = citySlug ? (purpose === 'rent' ? getCityRentHref(citySlug) : purpose === 'buy' ? getCityBuyHref(citySlug) : getProjectsCityHref(citySlug)) : undefined;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
+      <Breadcrumbs items={[
+        { label: 'Home', href: '/' },
+        { label: purpose === 'rent' ? 'Rent' : purpose === 'buy' ? 'Buy' : 'Projects', href: primaryHref },
+        ...(city ? [{ label: city, href: cityHref }] : []),
+        ...(propertyType ? [{ label: propertyType }] : []),
+      ]} />
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <section>
           <div className="flex flex-wrap gap-2">
@@ -72,15 +82,21 @@ export async function SeoDiscoveryPage({
             <QuickSearchChips context={context} />
           </div>
           <div className="mt-6 flex flex-wrap gap-2">
-            <Button href={`/${purpose ?? 'projects'}${citySlug ? `?citySlug=${citySlug}` : ''}`} asChild>Open live search</Button>
+            <Button href={cityHref ?? primaryHref} asChild>Open live search</Button>
             <Button href="/projects" asChild variant="secondary">Explore projects</Button>
           </div>
         </section>
         <Card className="p-5">
           <h2 className="text-lg font-black">Related searches</h2>
           <div className="mt-3 grid gap-2 text-sm font-semibold text-trust">
-            {mockPropertyTypes.slice(0, 4).map((type) => <Link key={type.id} href={`/buy/${type.code}/${city?.toLowerCase() ?? 'lahore'}`}>{type.name} in {city ?? 'Lahore'}</Link>)}
-            {mockAreas.slice(0, 3).map((area) => <Link key={area.id} href={`/area/${area.slug}`}>{area.name}, {area.cityName}</Link>)}
+            {mockPropertyTypes.slice(0, 4).flatMap((type) => {
+              if (!type.code) return [];
+              return <Link key={type.id} href={getBuyPropertyTypeCityHref(type.code, citySlug ?? 'lahore')}>{type.name} in {city ?? 'Lahore'}</Link>;
+            })}
+            {mockAreas.slice(0, 3).flatMap((area) => {
+              if (!area.slug) return [];
+              return <Link key={area.id} href={getAreaHref(area.slug)}>{area.name}, {area.cityName}</Link>;
+            })}
           </div>
         </Card>
       </div>

@@ -13,7 +13,7 @@ export function EmailLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const next = searchParams.get('next') ?? '/dashboard';
+  const next = searchParams.get('returnTo') ?? searchParams.get('next') ?? '/dashboard';
   const [error, setError] = useState('');
   const mutation = useMutation({
     mutationFn: (formData: FormData) => loginEmail(String(formData.get('email')), String(formData.get('password'))),
@@ -34,7 +34,7 @@ export function EmailLoginForm() {
         <Button disabled={mutation.isPending}>{mutation.isPending ? 'Signing in...' : 'Login'}</Button>
       </form>
       <div className="mt-4 flex flex-wrap justify-between gap-3 text-sm font-semibold">
-        <Link className="text-trust" href="/register">Create account</Link>
+        <Link className="text-trust" href={next ? `/register?returnTo=${encodeURIComponent(next)}` : '/register'}>Create account</Link>
         <Link className="text-trust" href="/forgot-password">Forgot password?</Link>
       </div>
     </Card>

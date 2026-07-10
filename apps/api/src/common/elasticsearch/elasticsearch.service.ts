@@ -59,7 +59,7 @@ export class ElasticsearchService {
         areaSlug: { type: 'keyword' },
         areaName: { type: 'text', fields: { keyword: { type: 'keyword' } } },
         purposeId: { type: 'keyword' },
-        purposeCode: { type: 'keyword' },
+        purposeSlug: { type: 'keyword' },
         propertyTypeId: { type: 'keyword' },
         propertyTypeCode: { type: 'keyword' },
         verificationStatus: { type: 'keyword' },

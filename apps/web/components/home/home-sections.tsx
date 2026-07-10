@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Badge, InfoChip } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { getAreaHref, getBuyPropertyTypeCityHref, getCityRentHref } from '@/lib/routes';
 
 const categories = [
   ['Buy Property', '/buy', 'Homes, apartments, plots'],
@@ -9,7 +10,7 @@ const categories = [
   ['New Projects', '/projects', 'Payment plans and timelines'],
   ['Commercial', '/buy?propertyTypeCode=commercial', 'Shops, offices, buildings'],
   ['Plots', '/buy?propertyTypeCode=plot', 'Residential and commercial land'],
-  ['Explore Areas', '/area/dha-phase-6-lahore', 'Neighborhood discovery'],
+  ['DHA Phase 6 Lahore', getAreaHref('dha-phase-6-lahore'), 'Neighborhood discovery'],
 ];
 
 export function TrustStrip() {
@@ -44,7 +45,13 @@ export function QuickCategories() {
 }
 
 export function AreaDiscovery() {
-  const areas = ['DHA Phase 6 Lahore', 'Clifton Karachi', 'G-13 Islamabad', 'Bahria Town', 'Gulberg Lahore'];
+  const areas = [
+    ['DHA Phase 6 Lahore', getAreaHref('dha-phase-6-lahore')],
+    ['Clifton Karachi', getAreaHref('clifton-karachi')],
+    ['G-13 Islamabad', getAreaHref('g-13-islamabad')],
+    ['Bahria Town Karachi', getAreaHref('bahria-town-karachi')],
+    ['Gulberg Lahore', getAreaHref('gulberg-lahore')],
+  ];
   return (
     <section className="mx-auto max-w-7xl px-4 py-8">
       <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
@@ -55,7 +62,7 @@ export function AreaDiscovery() {
         </div>
         <Card className="p-5">
           <div className="flex flex-wrap gap-2">
-            {areas.map((area) => <Link key={area} href={`/buy?q=${encodeURIComponent(area)}`}><InfoChip>{area}</InfoChip></Link>)}
+            {areas.map(([label, href]) => <Link key={label} href={href}><InfoChip>{label}</InfoChip></Link>)}
           </div>
         </Card>
       </div>
@@ -98,9 +105,9 @@ export function FeaturedAgencies() {
 
 export function PopularQuickSearches() {
   const groups = [
-    ['Popular locations for plots', [['DHA Lahore plots', '/buy/plot/lahore'], ['Bahria Town Karachi plots', '/buy/plot/karachi'], ['Gulberg Islamabad plots', '/buy/plot/islamabad']]],
-    ['House rent demand', [['Houses for rent in Lahore', '/rent/lahore?propertyTypeCode=house'], ['Karachi family rentals', '/rent/karachi?propertyTypeCode=house'], ['Islamabad rentals', '/rent/islamabad?propertyTypeCode=house']]],
-    ['Apartment hotspots', [['Clifton apartments', '/buy/apartment/karachi'], ['Gulberg apartments', '/buy/apartment/lahore'], ['G-13 apartments', '/buy/apartment/islamabad']]],
+    ['Popular locations for plots', [['DHA Lahore plots', getBuyPropertyTypeCityHref('plot', 'lahore')], ['Bahria Town Karachi plots', getBuyPropertyTypeCityHref('plot', 'karachi')], ['Gulberg Islamabad plots', getBuyPropertyTypeCityHref('plot', 'islamabad')]]],
+    ['House rent demand', [['Houses for rent in Lahore', `${getCityRentHref('lahore')}?propertyTypeCode=house`], ['Karachi family rentals', `${getCityRentHref('karachi')}?propertyTypeCode=house`], ['Islamabad rentals', `${getCityRentHref('islamabad')}?propertyTypeCode=house`]]],
+    ['Apartment hotspots', [['Clifton apartments', getBuyPropertyTypeCityHref('apartment', 'karachi')], ['Gulberg apartments', getBuyPropertyTypeCityHref('apartment', 'lahore')], ['G-13 apartments', getBuyPropertyTypeCityHref('apartment', 'islamabad')]]],
     ['Commercial searches', [['Shops in Lahore', '/buy?propertyTypeCode=shop'], ['Offices in Karachi', '/buy?propertyTypeCode=office'], ['Warehouses', '/buy?propertyTypeCode=warehouse']]],
   ] as const;
   return (
@@ -127,7 +134,7 @@ export function SmartTools() {
   const tools = [
     ['Compare Properties', '/compare/listings', 'Live', 'Side-by-side price, size, trust, and amenities.'],
     ['Compare Projects', '/compare/projects', 'Live', 'Compare developers, possession, payment plans, and units.'],
-    ['Area Guides', '/area/dha-phase-6-lahore', 'Live', 'Explore area context with related inventory.'],
+    ['Area Guides', getAreaHref('dha-phase-6-lahore'), 'Live', 'Explore area context with related inventory.'],
     ['Price Trends', '', 'Coming soon', 'Track city and area price movement.'],
     ['Construction Cost Calculator', '', 'Coming soon', 'Estimate build costs by size and finish.'],
     ['Area Unit Converter', '', 'Coming soon', 'Convert marla, kanal, square feet, and yards.'],

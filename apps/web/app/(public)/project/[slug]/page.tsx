@@ -5,17 +5,18 @@ import { Badge, InfoChip } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/state';
-import { InquiryPanel } from '@/components/inquiries/inquiry-panel';
 import { ProjectCard } from '@/components/projects/project-card';
-import { FavoriteButton } from '@/components/favorites/favorite-button';
+import { ProjectActionPanel } from '@/components/projects/project-action-panel';
 import { CompareButton } from '@/components/compare/compare-button';
 import { InvestmentSummary } from '@/components/projects/investment-summary';
 import { RelatedGuides } from '@/components/content/blog-card';
 import { ViewTracker } from '@/components/analytics/view-tracker';
 import { GlobalSearchBar } from '@/components/search/global-search-bar';
+import { Breadcrumbs } from '@/components/navigation/breadcrumbs';
 import { ProjectDisclaimer, SponsoredDisclaimer } from '@/components/legal/disclaimers';
 import { listLatestBlogPosts } from '@/lib/api/wordpress';
 import { getProject, getSimilarProjects } from '@/lib/api/marketplace';
+import { getAreaHref, getProjectsCityHref } from '@/lib/routes';
 import { formatDate, formatPrice } from '@/lib/utils';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -34,13 +35,22 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   if (!project) notFound();
   const similarProjects = await getSimilarProjects(project.id).catch(() => []);
   const displayedSimilarProjects = similarProjects.filter((item) => item.slug !== project.slug).slice(0, 3);
+  const cityHref = project.citySlug ? getProjectsCityHref(project.citySlug) : '/projects';
+  const areaHref = project.areaSlug ? getAreaHref(project.areaSlug) : undefined;
 
   return (
     <>
     <ViewTracker eventType="project_viewed" entityType="project" entityId={project.id} metadataJson={{ slug: project.slug }} />
     <GlobalSearchBar initialTab="projects" compact />
     <div className="mx-auto max-w-7xl px-4 py-8">
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <Breadcrumbs items={[
+        { label: 'Home', href: '/' },
+        { label: 'Projects', href: '/projects' },
+        { label: project.cityName, href: cityHref },
+        { label: project.areaName, href: areaHref },
+        { label: project.name },
+      ]} />
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
         <div className="grid gap-6">
           <div className="relative aspect-[16/9] overflow-hidden rounded-xl bg-stone-200">
             {project.coverImageUrl ? <Image src={project.coverImageUrl} alt="" fill className="object-cover" priority /> : null}
@@ -54,7 +64,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             <h1 className="mt-4 text-3xl font-black">{project.name}</h1>
             <p className="mt-2 text-lg font-bold text-muted">{project.developerName}</p>
             <p className="mt-1 text-muted">{project.areaName}, {project.cityName}</p>
-            <div className="mt-4 flex flex-wrap gap-2"><FavoriteButton entityType="project" entityId={project.id} /><CompareButton type="project" id={project.id} /></div>
+            <div className="mt-4 flex flex-wrap gap-2"><CompareButton type="project" id={project.id} /></div>
           </section>
           <ProjectDisclaimer />
           <Card className="p-5"><h2 className="text-xl font-black">Project overview</h2><p className="mt-3 leading-7 text-muted">{project.description}</p></Card>
@@ -87,10 +97,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </section>
           <RelatedGuides posts={guides} />
         </div>
-        <InquiryPanel subject={project.slug} projectId={project.id} />
-      </div>
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white p-3 shadow-soft lg:hidden">
-        <a className="flex min-h-11 items-center justify-center rounded-md bg-trust px-4 py-2 text-sm font-bold text-white" href="#inquiry">Request project details</a>
+        <ProjectActionPanel project={project} />
       </div>
     </div>
     </>

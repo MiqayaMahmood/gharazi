@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { AuthenticatedUser } from '@Gharazi/shared-types';
 import { makePublicId } from '@Gharazi/shared-utils';
 import { PrismaService } from '../../database/prisma.service';
 import { SearchIndexingService } from '../../common/queues/search-indexing.service';
@@ -62,6 +63,23 @@ export class ListingsService {
     });
   }
 
+  async getMine(userId: string, id: string) {
+    const listing = await this.prisma.listing.findFirst({
+      where: {
+        OR: [{ id }, { publicId: id }],
+        deletedAt: null,
+        AND: [{ OR: [{ ownerUserId: userId }, { managedByUserId: userId }] }],
+      },
+      include: this.detailInclude(),
+    });
+
+    if (!listing) {
+      throw new NotFoundException('Listing was not found for this account');
+    }
+
+    return listing;
+  }
+
   async getPublic(publicId: string) {
     const listing = await this.prisma.listing.findFirst({
       where: {
@@ -76,7 +94,7 @@ export class ListingsService {
       throw new NotFoundException('Listing was not found');
     }
 
-    return listing;
+    return this.mapPublicListing(listing);
   }
 
   async batchPublic(ids: string[]) {
@@ -90,7 +108,32 @@ export class ListingsService {
       include: this.detailInclude(),
     });
     const byId = new Map(listings.map((listing) => [listing.id, listing]));
-    return ids.map((id) => byId.get(id)).filter(Boolean);
+    return ids.map((id) => byId.get(id)).filter(Boolean).map((listing) => this.mapPublicListing(listing));
+  }
+
+  async getContact(id: string) {
+    const listing = await this.prisma.listing.findFirst({
+      where: {
+        OR: [{ id }, { publicId: id }],
+        deletedAt: null,
+        status: { in: [...PUBLIC_LISTING_STATUSES] },
+      },
+      select: {
+        contactName: true,
+        contactPhone: true,
+        contactWhatsapp: true,
+      },
+    });
+
+    if (!listing) {
+      throw new NotFoundException('Listing was not found');
+    }
+
+    return {
+      contactName: listing.contactName ?? undefined,
+      contactPhone: listing.contactPhone ?? undefined,
+      whatsappUrl: listing.contactWhatsapp || listing.contactPhone ? `https://wa.me/${this.normalizePhone(listing.contactWhatsapp ?? listing.contactPhone ?? '')}` : undefined,
+    };
   }
 
   async update(userId: string, id: string, dto: UpdateListingDto) {
@@ -136,22 +179,22 @@ export class ListingsService {
     return updated;
   }
 
-  async archive(userId: string, id: string) {
-    const listing = await this.assertCanWrite(userId, id);
+  async archive(user: AuthenticatedUser, id: string) {
+    const listing = await this.assertCanManage(user, id);
     if (['archived', 'expired'].includes(listing.status)) {
       return listing;
     }
 
-    const updated = await this.transition(userId, id, listing.status, 'archived', 'Listing archived');
+    const updated = await this.transition(user.id, listing.id, listing.status, 'archived', 'Listing archived');
     await this.indexing.deleteListing(updated.id, updated.publicId);
 
     return updated;
   }
 
-  async refresh(userId: string, id: string) {
-    const listing = await this.assertCanWrite(userId, id);
+  async refresh(user: AuthenticatedUser, id: string) {
+    const listing = await this.assertCanManage(user, id);
     const updated = await this.prisma.listing.update({
-      where: { id },
+      where: { id: listing.id },
       data: { lastRefreshedAt: new Date() },
       include: this.detailInclude(),
     });
@@ -161,6 +204,70 @@ export class ListingsService {
     }
 
     return updated;
+  }
+
+  async markStatus(user: AuthenticatedUser, id: string, status: 'sold' | 'rented') {
+    const listing = await this.assertCanManage(user, id);
+    const updated = await this.transition(user.id, listing.id, listing.status, status, `Listing marked ${status}`);
+    await this.indexing.indexListing(updated.id, updated.publicId);
+    return updated;
+  }
+
+  async viewerContext(user: AuthenticatedUser, id: string) {
+    const listing = await this.prisma.listing.findFirst({
+      where: { OR: [{ id }, { publicId: id }], deletedAt: null },
+      select: { id: true, ownerUserId: true, managedByUserId: true, status: true },
+    });
+    if (!listing) throw new NotFoundException('Listing was not found');
+    const isOwner = listing.ownerUserId === user.id;
+    const isManager = listing.managedByUserId === user.id;
+    const admin = this.isAdminOrModerator(user);
+    const canManage = isOwner || isManager || admin;
+    return {
+      isOwner,
+      isManager,
+      isAdmin: admin,
+      canManage,
+      canContact: !canManage && listing.status === 'active',
+      canFavorite: !canManage && listing.status === 'active',
+      canEdit: canManage,
+      canArchive: canManage,
+      canRefresh: canManage,
+      canMarkSoldOrRented: canManage && ['active', 'draft'].includes(listing.status),
+    };
+  }
+
+  async ownerSummary(user: AuthenticatedUser, id: string) {
+    const listing = await this.assertCanManage(user, id);
+    const [daily, favoritesCount, inquiriesCount, chatsCount, messagesCount] = await Promise.all([
+      this.prisma.listingDailyStat.aggregate({
+        where: { listingId: listing.id },
+        _sum: {
+          viewsCount: true,
+          uniqueViewsCount: true,
+          savesCount: true,
+          inquiriesCount: true,
+          chatsStartedCount: true,
+        },
+      }),
+      this.prisma.favorite.count({ where: { entityType: 'listing', entityId: listing.id } }),
+      this.prisma.inquiry.count({ where: { listingId: listing.id } }),
+      this.prisma.chat.count({ where: { listingId: listing.id } }),
+      this.prisma.chatMessage.count({ where: { chat: { listingId: listing.id } } }),
+    ]);
+    return {
+      listingId: listing.id,
+      status: listing.status,
+      views: daily._sum.viewsCount ?? listing.viewCount ?? 0,
+      uniqueViews: daily._sum.uniqueViewsCount ?? 0,
+      favorites: daily._sum.savesCount ?? favoritesCount,
+      inquiries: daily._sum.inquiriesCount ?? inquiriesCount,
+      chats: daily._sum.chatsStartedCount ?? chatsCount,
+      messages: messagesCount,
+      lastRefreshedAt: listing.lastRefreshedAt,
+      publishedAt: listing.publishedAt,
+      searchVisibility: listing.status === 'active' ? 'Public search' : 'Not public',
+    };
   }
 
   async addMedia(userId: string, id: string, dto: AddListingMediaDto) {
@@ -193,6 +300,26 @@ export class ListingsService {
     }
 
     return listing;
+  }
+
+  private async assertCanManage(user: Pick<AuthenticatedUser, 'id' | 'roles'>, id: string) {
+    const listing = await this.prisma.listing.findFirst({
+      where: {
+        OR: [{ id }, { publicId: id }],
+        deletedAt: null,
+        ...(this.isAdminOrModerator(user) ? {} : { AND: [{ OR: [{ ownerUserId: user.id }, { managedByUserId: user.id }] }] }),
+      },
+    });
+
+    if (!listing) {
+      throw new ForbiddenException('Listing is not available for this user');
+    }
+
+    return listing;
+  }
+
+  private isAdminOrModerator(user: Pick<AuthenticatedUser, 'roles'>) {
+    return (user.roles ?? []).some((role) => ['admin', 'moderator'].includes(role.toLowerCase()));
   }
 
   private assertPublishable(listing: { title: string; description: string; priceAmount: unknown; areaValue: unknown }) {
@@ -249,6 +376,56 @@ export class ListingsService {
       amenities: { include: { amenity: true } },
       statusHistory: { orderBy: { createdAt: 'desc' as const }, take: 10 },
     };
+  }
+
+  private mapPublicListing(listing: any) {
+    return {
+      id: listing.id,
+      publicId: listing.publicId,
+      purposeId: listing.purposeId,
+      propertyTypeId: listing.propertyTypeId,
+      cityId: listing.cityId,
+      areaId: listing.areaId,
+      title: listing.title,
+      description: listing.description,
+      priceAmount: listing.priceAmount,
+      priceCurrency: listing.priceCurrency,
+      areaValue: listing.areaValue,
+      areaUnit: listing.areaUnit,
+      bedrooms: listing.bedrooms,
+      bathrooms: listing.bathrooms,
+      floorNumber: listing.floorNumber,
+      totalFloors: listing.totalFloors,
+      yearBuilt: listing.yearBuilt,
+      furnishedStatus: listing.furnishedStatus,
+      possessionStatus: listing.possessionStatus,
+      latitude: listing.latitude,
+      longitude: listing.longitude,
+      locationPrecision: listing.locationPrecision,
+      status: listing.status,
+      verificationStatus: listing.verificationStatus,
+      isFeatured: listing.isFeatured,
+      isHot: listing.isHot,
+      publishedAt: listing.publishedAt,
+      expiresAt: listing.expiresAt,
+      lastRefreshedAt: listing.lastRefreshedAt,
+      createdAt: listing.createdAt,
+      updatedAt: listing.updatedAt,
+      purpose: listing.purpose,
+      propertyType: listing.propertyType,
+      city: listing.city,
+      area: listing.area,
+      media: listing.media,
+      amenities: listing.amenities,
+      listerRole: 'Owner/agent',
+    };
+  }
+
+  private normalizePhone(phone: string) {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.startsWith('00')) return digits.slice(2);
+    if (digits.startsWith('0')) return `92${digits.slice(1)}`;
+    return digits;
   }
 
   private errorSummary(error: unknown) {

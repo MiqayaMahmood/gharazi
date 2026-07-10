@@ -2,7 +2,7 @@ import { apiRequest, getStoredToken } from './client';
 import { readWithFallback } from './mock-fallback';
 import { mockChats, mockChatMessages, mockFavorites, mockInquiries, mockListings, mockNotifications, mockProjects, mockSavedSearches } from '@/lib/mock-data';
 import type { ChatMessage, ChatThread, Favorite, FavoriteEntityType, Inquiry, Notification, SavedSearch } from '@/types/engagement';
-import type { Listing, Project } from '@/types/marketplace';
+import type { Listing, ListingContact, Project } from '@/types/marketplace';
 
 function requireSession() {
   if (!getStoredToken()) throw new Error('Login required');
@@ -53,10 +53,16 @@ export function deleteSavedSearch(id: string) {
 }
 
 export function createInquiry(input: { listingId?: string; projectId?: string; inquiryType?: string; firstMessage?: string; createChat?: boolean }) {
+  requireSession();
   return apiRequest<Inquiry>('/inquiries', {
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+export function getListingContact(listingId: string) {
+  requireSession();
+  return apiRequest<ListingContact>(`/listings/${listingId}/contact`);
 }
 
 export function listInquiries() {

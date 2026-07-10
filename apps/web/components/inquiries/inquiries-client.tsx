@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { Badge, InfoChip } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { EmptyState, ErrorState, Skeleton } from '@/components/ui/state';
@@ -7,14 +8,18 @@ import { useInquiries } from '@/lib/query/hooks';
 import { formatDate } from '@/lib/utils';
 
 export function InquiriesClient() {
+  const searchParams = useSearchParams();
+  const listingId = searchParams.get('listingId');
+  const projectId = searchParams.get('projectId');
   const { data = [], isLoading, isError } = useInquiries();
+  const filtered = data.filter((inquiry) => (!listingId || inquiry.listingId === listingId) && (!projectId || inquiry.projectId === projectId));
   if (isLoading) return <Skeleton className="h-80" />;
   if (isError) return <ErrorState title="Inquiries failed to load" message="Please retry after refreshing the page." />;
-  if (data.length === 0) return <EmptyState title="No inquiries yet" message="Inquiries from listing and project detail pages will appear here." />;
+  if (filtered.length === 0) return <EmptyState title="No inquiries yet" message="Inquiries from listing and project detail pages will appear here." />;
 
   return (
     <div className="grid gap-4">
-      {data.map((inquiry) => (
+      {filtered.map((inquiry) => (
         <Card key={inquiry.id} className="p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

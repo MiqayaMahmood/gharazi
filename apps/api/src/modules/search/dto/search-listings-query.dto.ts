@@ -10,9 +10,9 @@ export class SearchListingsQueryDto {
   @IsOptional() @Matches(SLUG_PATTERN, { message: 'citySlug must be a URL slug such as lahore or karachi.' }) citySlug?: string;
   @IsOptional() @IsUUID('4', { message: 'areaId must be a UUID. Use areaSlug for area slugs.' }) areaId?: string;
   @IsOptional() @Matches(SLUG_PATTERN, { message: 'areaSlug must be a URL slug such as dha-phase-6-lahore.' }) areaSlug?: string;
-  @IsOptional() @IsUUID('4', { message: 'purposeId must be a UUID. Use purposeCode for purpose codes.' }) purposeId?: string;
+  @IsOptional() @IsUUID('4', { message: 'purposeId must be a UUID. Use purposeName for purpose Name.' }) purposeId?: string;
   @IsOptional() @IsIn(['buy', 'sale', 'rent'], { message: 'purpose must be one of buy, sale, or rent.' }) purpose?: string;
-  @IsOptional() @Matches(CODE_PATTERN, { message: 'purposeCode must be a code such as sale or rent.' }) purposeCode?: string;
+  @IsOptional() @Matches(CODE_PATTERN, { message: 'purposeSlug must be a code such as sale or rent.' }) purposeSlug?: string;
   @IsOptional() @IsUUID('4', { message: 'propertyTypeId must be a UUID. Use propertyTypeCode for codes such as house, apartment, commercial, or plot.' }) propertyTypeId?: string;
   @IsOptional() @Matches(CODE_PATTERN, { message: 'propertyTypeCode must be a code such as house, apartment, commercial, or plot.' }) propertyTypeCode?: string;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) minPrice?: number;
@@ -34,5 +34,5 @@ export class SearchListingsQueryDto {
   @IsIn(['relevant', 'newest', 'price_low_high', 'price_high_low', 'area_low_high', 'area_high_low'])
   sort?: string = 'relevant';
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number = 1;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number = 20;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1000) limit?: number = 20;
 }

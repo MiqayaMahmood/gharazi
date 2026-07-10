@@ -56,6 +56,16 @@ export function DashboardOverviewClient() {
           <Button className="mt-4" asChild href="/dashboard/chats" variant="secondary">Open chats</Button>
         </Card>
       </div>
+      <Card className="p-5">
+        <h2 className="text-xl font-black">Company / Professional tools</h2>
+        <p className="mt-2 text-sm leading-6 text-muted">
+          Company profile, multi-agent management, developer project tooling, verification, subscriptions, and listing limits are planned for the next phase. Current listing, project, inquiry, chat, and profile tools remain available here.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button asChild href="/help" variant="secondary">Read account guidance</Button>
+          <Button asChild href="/dashboard/profile" variant="secondary">Update profile</Button>
+        </div>
+      </Card>
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
           <div className="flex items-center justify-between gap-3">

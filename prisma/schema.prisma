@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://Gharazi:Gharazi123@localhost:5432/postgres?schema=gharazi"
+  url      = "postgresql://postgres.ydgjhffwapjdnepqvzhp:Liviton123$$@aws-1-eu-north-1.pooler.supabase.com:5432/postgres?schema=sch_gharazi"
 }
 
 model User {
@@ -269,6 +269,8 @@ model Listing {
   addressLine        String?                @map("address_line") @db.VarChar(500)
   contactName        String?                @map("contact_name") @db.VarChar(120)
   contactPhone       String?                @map("contact_phone") @db.VarChar(32)
+  contactWhatsapp    String?                @map("contact_whatsapp") @db.VarChar(32)
+  sourceUrl          String?                @map("source_url") @db.VarChar(1000)
   status             String                 @default("draft") @db.VarChar(32)
   verificationStatus String                 @default("unverified") @map("verification_status") @db.VarChar(32)
   isFeatured         Boolean                @default(false) @map("is_featured")
@@ -936,6 +938,23 @@ model InboundSubmission {
   @@index([userId])
   @@index([assignedToUserId])
   @@map("inbound_submissions")
+}
+
+model NewsletterSubscriber {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String    @unique @db.VarChar(255)
+  name          String?   @db.VarChar(120)
+  city          String?   @db.VarChar(120)
+  interestsJson Json?     @map("interests_json")
+  sourcePage    String?   @map("source_page") @db.VarChar(500)
+  status        String    @default("active") @db.VarChar(32)
+  confirmedAt   DateTime? @map("confirmed_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, createdAt])
+  @@index([city])
+  @@map("newsletter_subscribers")
 }
 
 enum UserStatus {
