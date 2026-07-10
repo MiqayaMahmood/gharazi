@@ -87,7 +87,7 @@ test-results/
 # Local uploads (if any)
 # -----------------------------
 uploads/
-media/
+
 
 # -----------------------------
 # Terraform / infra (future-safe)
