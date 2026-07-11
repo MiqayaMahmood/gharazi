@@ -64,7 +64,7 @@ export function ListingGallery({ images, title }: { images?: ListingImage[]; tit
               onClick={() => setSelected(index)}
               aria-label={`Show image ${index + 1} of ${orderedImages.length}`}
             >
-              <Image src={image.url} alt="" fill className="object-cover" sizes="120px" />
+              <Image src={image.url} alt={`${title} photo ${index + 1}`} fill className="object-cover" sizes="120px" />
             </button>
           ))}
         </div>

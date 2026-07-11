@@ -18,15 +18,14 @@ import { listLatestBlogPosts } from '@/lib/api/wordpress';
 import { getProject, getSimilarProjects } from '@/lib/api/marketplace';
 import { getAreaHref, getProjectsCityHref } from '@/lib/routes';
 import { formatDate, formatPrice } from '@/lib/utils';
+import { generateProjectMetadata } from '@/lib/seo/seo-templates';
+import { projectSchemas } from '@/lib/seo/structured-data';
+import { JsonLd } from '@/components/seo/json-ld';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const project = await getProject(slug);
-  return {
-    title: project.name,
-    description: `${project.name} by ${project.developerName} in ${project.areaName}, ${project.cityName}.`,
-    alternates: { canonical: `/project/${slug}` },
-  };
+  return generateProjectMetadata(project);
 }
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -40,6 +39,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   return (
     <>
+    <JsonLd data={projectSchemas(project)} />
     <ViewTracker eventType="project_viewed" entityType="project" entityId={project.id} metadataJson={{ slug: project.slug }} />
     <GlobalSearchBar initialTab="projects" compact />
     <div className="mx-auto max-w-7xl px-4 py-8">
@@ -53,7 +53,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
         <div className="grid gap-6">
           <div className="relative aspect-[16/9] overflow-hidden rounded-xl bg-stone-200">
-            {project.coverImageUrl ? <Image src={project.coverImageUrl} alt="" fill className="object-cover" priority /> : null}
+            {project.coverImageUrl ? <Image src={project.coverImageUrl} alt={`${project.name} in ${project.areaName}, ${project.cityName}`} fill className="object-cover" priority sizes="(min-width: 1024px) 820px, 100vw" /> : null}
           </div>
           <section>
             <div className="flex flex-wrap gap-2">

@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { JsonLd } from '@/components/seo/json-ld';
+import { breadcrumbSchema } from '@/lib/seo/structured-data';
 
 export type BreadcrumbItem = {
   label: string;
@@ -8,7 +10,7 @@ export type BreadcrumbItem = {
 export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
   if (!items.length) return null;
   return (
-    <nav aria-label="Breadcrumb" className="mb-5 overflow-x-auto">
+    <><JsonLd data={breadcrumbSchema(items)} /><nav aria-label="Breadcrumb" className="mb-5 overflow-x-auto">
       <ol className="flex min-w-0 items-center gap-2 text-sm font-semibold text-muted">
         {items.map((item, index) => {
           const current = index === items.length - 1;
@@ -28,6 +30,6 @@ export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
           );
         })}
       </ol>
-    </nav>
+    </nav></>
   );
 }

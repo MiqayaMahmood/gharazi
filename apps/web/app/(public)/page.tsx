@@ -11,6 +11,11 @@ import { AreaDiscovery, FeaturedAgencies, PopularQuickSearches, QuickCategories,
 import { FeedbackForm } from '@/components/feedback/feedback-form';
 import { HeroAdSlot, InlineAdSlot } from '@/components/ads/ad-slot';
 import { SponsoredDisclaimer } from '@/components/legal/disclaimers';
+import { generateHomeMetadata } from '@/lib/seo/seo-templates';
+import { homeSchemas } from '@/lib/seo/structured-data';
+import { JsonLd } from '@/components/seo/json-ld';
+
+export const metadata = generateHomeMetadata();
 
 export default async function HomePage() {
   const [guides, listings, projects] = await Promise.all([
@@ -26,6 +31,7 @@ export default async function HomePage() {
   ]);
   return (
     <>
+      <JsonLd data={homeSchemas()} />
       <section className="border-b border-line bg-[linear-gradient(180deg,#f4f8f4_0%,#fbfbf7_100%)]">
         <HeroSearch />
         <HeroCarousel fullWidth />

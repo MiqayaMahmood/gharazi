@@ -2,11 +2,9 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { ListingSearchClient } from '@/components/search/search-results-client';
 import { Skeleton } from '@/components/ui/state';
+import { createMetadata } from '@/lib/seo/metadata';
 
-export const metadata: Metadata = {
-  title: 'Rent property in Pakistan',
-  description: 'Find fresh rental listings with verified signals and safer inquiry options.',
-};
+export const metadata: Metadata = createMetadata({ title: 'Properties for Rent in Pakistan', description: 'Find houses, apartments and commercial properties for rent across Pakistan with fresh listings and safer inquiry options.', path: '/rent' });
 
 export default function RentPage() {
   return (

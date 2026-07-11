@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/state';
 import { ListingCard } from '@/components/listings/listing-card';
+import { ProjectCard } from '@/components/projects/project-card';
 import { ListingGallery } from '@/components/listings/listing-gallery';
 import { ListingActionPanel } from '@/components/listings/listing-action-panel';
 import { CompareButton } from '@/components/compare/compare-button';
@@ -14,18 +15,17 @@ import { GlobalSearchBar } from '@/components/search/global-search-bar';
 import { Breadcrumbs } from '@/components/navigation/breadcrumbs';
 import { ListingDisclaimer, SponsoredDisclaimer } from '@/components/legal/disclaimers';
 import { listLatestBlogPosts } from '@/lib/api/wordpress';
-import { getListing, getSimilarListings } from '@/lib/api/marketplace';
+import { getListing, getSimilarListings, searchProjects } from '@/lib/api/marketplace';
 import { getAreaHref, getCityBuyHref, getCityRentHref } from '@/lib/routes';
 import { formatDate, formatPrice } from '@/lib/utils';
+import { generateListingMetadata } from '@/lib/seo/seo-templates';
+import { listingSchemas } from '@/lib/seo/structured-data';
+import { JsonLd } from '@/components/seo/json-ld';
 
 export async function generateMetadata({ params }: { params: Promise<{ publicId: string }> }): Promise<Metadata> {
   const { publicId } = await params;
   const listing = await getListing(publicId);
-  return {
-    title: listing.title,
-    description: `${listing.title} in ${listing.areaName}, ${listing.cityName}. ${formatPrice(listing.priceAmount)}.`,
-    alternates: { canonical: `/listing/${publicId}` },
-  };
+  return generateListingMetadata(listing);
 }
 
 export default async function ListingDetailPage({ params }: { params: Promise<{ publicId: string }> }) {
@@ -33,6 +33,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
   const [listing, guides] = await Promise.all([getListing(publicId), listLatestBlogPosts(3)]);
   if (!listing) notFound();
   const similarListings = await getSimilarListings(listing.id).catch(() => []);
+  const nearbyProjects = await searchProjects({ citySlug: listing.citySlug, areaSlug: listing.areaSlug, limit: 3 }).then((result) => result.items).catch(() => []);
   const displayedSimilarListings = similarListings.filter((item) => item.publicId !== listing.publicId).slice(0, 3);
   const isRent = listing.purposeSlug?.toLowerCase().includes('rent');
   const purposeLabel = isRent ? 'Rent' : 'Buy';
@@ -41,6 +42,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
 
   return (
     <>
+    <JsonLd data={listingSchemas(listing)} />
     <ViewTracker eventType="listing_viewed" entityType="listing" entityId={listing.id} metadataJson={{ publicId: listing.publicId }} />
     <GlobalSearchBar initialTab={isRent ? 'rent' : 'buy'} compact />
     <div className="mx-auto max-w-7xl px-4 py-8">
@@ -62,7 +64,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
             </div>
             <h1 className="mt-4 text-3xl font-black">{listing.title}</h1>
             <p className="mt-2 text-2xl font-black text-trust">{formatPrice(listing.priceAmount)}</p>
-            <p className="mt-2 text-muted">{areaHref ? <a className="font-semibold text-trust" href={areaHref}>{listing.areaName}</a> : listing.areaName}, {listing.cityName}</p>
+            <p className="mt-2 text-muted">{areaHref ? <a className="font-semibold text-trust" href={areaHref}>{listing.areaName}</a> : listing.areaName}, <a className="font-semibold text-trust" href={cityHref}>{listing.cityName}</a></p>
             <div className="mt-4 flex flex-wrap gap-2"><CompareButton type="listing" id={listing.id} /></div>
           </section>
           <ListingDisclaimer />
@@ -91,6 +93,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
             ) : <EmptyState title="No similar listings yet" message="Related properties will appear here as matching inventory is published." />}
           </section>
           <RelatedGuides posts={guides} />
+          {nearbyProjects.length ? <section><h2 className="mb-4 text-xl font-black">Projects near {listing.areaName}</h2><div className="grid gap-4 md:grid-cols-3">{nearbyProjects.map((project) => <ProjectCard key={project.id} project={project} />)}</div></section> : null}
         </div>
         <ListingActionPanel listing={listing} />
       </div>

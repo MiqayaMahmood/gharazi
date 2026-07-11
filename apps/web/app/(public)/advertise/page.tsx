@@ -7,12 +7,9 @@ import { Card } from '@/components/ui/card';
 import { AdvertisingDisclaimer } from '@/components/legal/disclaimers';
 import { advertisingFaqs, advertisingPackages, audienceLabels, sponsoredPlacements, type AdvertisingAudience, type AdvertisingPackage } from '@/lib/advertising/packages';
 import { CheckoutButton } from '@/components/payments/checkout-button';
+import { generateAdvertiseMetadata } from '@/lib/seo/seo-templates';
 
-export const metadata: Metadata = {
-  title: 'Advertise Property on Gharazi Pakistan | Real Estate Ads & Packages',
-  description: 'Promote listings, agencies, projects, and sponsored real-estate campaigns on Gharazi Pakistan with lead-ready advertising packages.',
-  alternates: { canonical: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/advertise` },
-};
+export const metadata: Metadata = generateAdvertiseMetadata();
 
 const audiences: AdvertisingAudience[] = ['individuals', 'agencies', 'developers', 'sponsored'];
 

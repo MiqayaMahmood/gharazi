@@ -4,11 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { listBlogPosts } from '@/lib/api/wordpress';
 import type { BlogListResult, BlogSort } from '@/lib/wordpress/types';
+import { createMetadata } from '@/lib/seo/metadata';
 
-export const metadata: Metadata = {
-  title: 'Real estate guides and insights',
-  description: 'WordPress-powered Pakistan property guides for buyers, renters, investors, and project research.',
-};
+export const metadata: Metadata = createMetadata({ title: 'Pakistan Real Estate Guides and Insights', description: 'WordPress-powered Pakistan property guides for buyers, renters, investors and new-project research.', path: '/blog' });
 
 type BlogSearchParams = {
   page?: string;

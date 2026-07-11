@@ -9,12 +9,13 @@ import { mockAreas, mockListings, mockProjects } from '@/lib/mock-data';
 import { RelatedGuides } from '@/components/content/blog-card';
 import { listLatestBlogPosts } from '@/lib/api/wordpress';
 import { Breadcrumbs } from '@/components/navigation/breadcrumbs';
+import { generateAreaMetadata } from '@/lib/seo/seo-templates';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const area = mockAreas.find((item) => item.slug === slug);
   const title = area ? `${area.name}, ${area.cityName}` : readable(slug);
-  return { title: `${title} property guide`, description: `Explore buy, rent, and project opportunities in ${title}.` };
+  return generateAreaMetadata(area?.name ?? readable(slug), area?.cityName ?? 'Pakistan', slug);
 }
 
 export default async function AreaPage({ params }: { params: Promise<{ slug: string }> }) {

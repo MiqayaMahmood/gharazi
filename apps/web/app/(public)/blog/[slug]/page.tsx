@@ -11,21 +11,16 @@ import { Card } from '@/components/ui/card';
 import { BlogDisclaimer } from '@/components/legal/disclaimers';
 import { getBlogComments, getBlogPost, getRelatedBlogPosts } from '@/lib/api/wordpress';
 import { formatDate } from '@/lib/utils';
+import { generateBlogMetadata } from '@/lib/seo/seo-templates';
+import { blogSchemas } from '@/lib/seo/structured-data';
+import { JsonLd } from '@/components/seo/json-ld';
+import { Breadcrumbs } from '@/components/navigation/breadcrumbs';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const post = await getBlogPost(slug).catch(() => null);
   if (!post) return { title: 'Guide not found' };
-  return {
-    title: post.title,
-    description: post.excerpt,
-    alternates: { canonical: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/blog/${post.slug}` },
-    openGraph: {
-      title: post.title,
-      description: post.excerpt,
-      images: post.coverImageUrl ? [{ url: post.coverImageUrl }] : undefined,
-    },
-  };
+  return generateBlogMetadata(post);
 }
 
 export default async function BlogDetailPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -37,10 +32,12 @@ export default async function BlogDetailPage({ params }: { params: Promise<{ slu
 
   return (
     <article className="mx-auto max-w-4xl px-4 py-10">
+      <JsonLd data={blogSchemas(post)} />
+      <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Blog', href: '/blog' }, { label: post.title }]} />
       <ViewTracker eventType="blog_viewed" entityType="blog" metadataJson={{ slug: post.slug, wpId: post.wpId }} />
       <div className="flex flex-wrap items-center gap-2">
         <Badge>Guide</Badge>
-        {post.categories.slice(0, 2).map((category) => <Badge key={category.id}>{category.name}</Badge>)}
+        {post.categories.slice(0, 2).map((category) => <Link key={category.id} href={`/blog/category/${category.slug}`}><Badge>{category.name}</Badge></Link>)}
       </div>
       <h1 className="mt-4 text-4xl font-black">{post.title}</h1>
       <p className="mt-3 text-muted">{formatDate(post.publishedAt)} - {post.authorName ?? 'Gharazieditorial'}</p>
@@ -70,6 +67,7 @@ export default async function BlogDetailPage({ params }: { params: Promise<{ slu
           <Link className="text-sm font-bold text-trust" href="/blog">View all guides</Link>
         </div>
       </Card>
+      <Card className="mt-6 p-5"><h2 className="text-xl font-black">Continue your property research</h2><div className="mt-4 flex flex-wrap gap-3 text-sm font-bold text-trust"><Link href="/buy">Properties for sale</Link><Link href="/rent">Rental properties</Link><Link href="/projects">New projects</Link><Link href="/help">Buyer and verification help</Link></div></Card>
     </article>
   );
 }

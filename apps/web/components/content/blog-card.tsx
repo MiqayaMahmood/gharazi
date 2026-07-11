@@ -11,7 +11,7 @@ export function BlogCard({ post }: { post: BlogCardPost }) {
   return (
     <Card className="overflow-hidden">
       <div className="relative aspect-[16/9] bg-stone-200">
-        {post.coverImageUrl ? <Image src={post.coverImageUrl} alt={'coverImageAlt' in post ? post.coverImageAlt ?? '' : ''} fill className="object-cover" sizes="(min-width: 768px) 33vw, 100vw" /> : null}
+        {post.coverImageUrl ? <Image src={post.coverImageUrl} alt={'coverImageAlt' in post ? post.coverImageAlt ?? post.title : post.title} fill className="object-cover" sizes="(min-width: 768px) 33vw, 100vw" /> : null}
       </div>
       <div className="grid gap-3 p-4">
         <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-muted">

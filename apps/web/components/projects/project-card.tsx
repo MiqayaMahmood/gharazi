@@ -15,7 +15,7 @@ export function ProjectCard({ project }: { project: Project }) {
   return (
     <Card className="overflow-hidden border-sky/20">
       <Link href={detailsHref} aria-label={`View project details for ${project.name}`} className="relative block aspect-[16/10] bg-stone-200">
-        {project.coverImageUrl ? <Image src={project.coverImageUrl} alt="" fill className="object-cover" sizes="(min-width: 768px) 33vw, 100vw" /> : null}
+        {project.coverImageUrl ? <Image src={project.coverImageUrl} alt={`${project.name} project in ${project.areaName}, ${project.cityName}`} fill className="object-cover" sizes="(min-width: 768px) 33vw, 100vw" /> : null}
         {project.legalStatus ? <Badge className="absolute left-3 top-3 bg-sky-50 text-sky">{project.legalStatus}</Badge> : null}
       </Link>
       <div className="grid gap-3 p-4">

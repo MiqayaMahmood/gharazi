@@ -1,11 +1,9 @@
 import type { Metadata } from 'next';
 import { Card } from '@/components/ui/card';
 import { Breadcrumbs } from '@/components/navigation/breadcrumbs';
+import { createMetadata } from '@/lib/seo/metadata';
 
-export const metadata: Metadata = {
-  title: 'Help',
-  description: 'Help for posting listings, searching property, professional accounts, and safe property decisions.',
-};
+export const metadata: Metadata = createMetadata({ title: 'Gharazi Help and Property Guidance', description: 'Help for posting listings, searching property, professional accounts, verification and safer property decisions.', path: '/help' });
 
 const sections = [
   {

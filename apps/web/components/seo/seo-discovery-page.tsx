@@ -3,10 +3,9 @@ import { Badge, InfoChip } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/state';
-import { mockAreas, mockPropertyTypes } from '@/lib/mock-data';
 import { Breadcrumbs } from '@/components/navigation/breadcrumbs';
 import type { BlogPost } from '@/types/cms';
-import { searchListings, searchProjects } from '@/lib/api/marketplace';
+import { autocompleteAreas, searchListings, searchProjects } from '@/lib/api/marketplace';
 import { getAreaHref, getBuyPropertyTypeCityHref, getCityBuyHref, getCityRentHref, getProjectsCityHref } from '@/lib/routes';
 import {
   ContextualGuidesSection,
@@ -20,6 +19,9 @@ import {
   SuggestedAreasSection,
 } from '@/components/search/search-landing-content';
 import { categoryForPropertyType, type SearchLandingContext } from '@/lib/search/search-context';
+import { listPropertyTypes } from '@/lib/api/reference';
+import { JsonLd } from '@/components/seo/json-ld';
+import { faqSchema } from '@/lib/seo/structured-data';
 
 export async function SeoDiscoveryPage({
   title,
@@ -48,7 +50,7 @@ export async function SeoDiscoveryPage({
     propertyTypeCode,
     category: purpose ? categoryForPropertyType(propertyTypeCode) : 'project',
   };
-  const [listings, projects] = await Promise.all([
+  const [listings, projects, propertyTypes, relatedAreas] = await Promise.all([
     purpose ? searchListings({
       purposeSlug: purpose === 'rent' ? 'rent' : 'sale',
       citySlug,
@@ -57,12 +59,20 @@ export async function SeoDiscoveryPage({
       limit: 3,
     }).then((response) => response.items).catch(() => []) : Promise.resolve([]),
     searchProjects({ citySlug, sort: 'newest', limit: 3 }).then((response) => response.items).catch(() => []),
+    listPropertyTypes().catch(() => []),
+    autocompleteAreas(city ?? '').catch(() => []),
   ]);
   const primaryHref = purpose === 'rent' ? '/rent' : purpose === 'buy' ? '/buy' : '/projects';
   const cityHref = citySlug ? (purpose === 'rent' ? getCityRentHref(citySlug) : purpose === 'buy' ? getCityBuyHref(citySlug) : getProjectsCityHref(citySlug)) : undefined;
+  const faqItems: Array<[string, string]> = [
+    [`How can I find ${purpose === 'rent' ? 'rental' : purpose === 'buy' ? 'sale' : 'project'} options${city ? ` in ${city}` : ''}?`, 'Use the live search filters, review freshness and verification signals, and contact the owner, agent, or developer through the listing or project page.'],
+    [`What should I verify before committing${city ? ` to property in ${city}` : ''}?`, 'Confirm ownership or developer identity, legal and approval documents, exact location, property condition, price terms, and payment requests independently.'],
+    ['Does Gharazi publish average market prices?', 'Gharazi does not invent market statistics. Prices shown come from currently available listings and projects; verify final terms directly before making a decision.'],
+  ];
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
+      <JsonLd data={faqSchema(faqItems)} />
       <Breadcrumbs items={[
         { label: 'Home', href: '/' },
         { label: purpose === 'rent' ? 'Rent' : purpose === 'buy' ? 'Buy' : 'Projects', href: primaryHref },
@@ -89,13 +99,13 @@ export async function SeoDiscoveryPage({
         <Card className="p-5">
           <h2 className="text-lg font-black">Related searches</h2>
           <div className="mt-3 grid gap-2 text-sm font-semibold text-trust">
-            {mockPropertyTypes.slice(0, 4).flatMap((type) => {
+            {propertyTypes.slice(0, 4).flatMap((type) => {
               if (!type.code) return [];
               return <Link key={type.id} href={getBuyPropertyTypeCityHref(type.code, citySlug ?? 'lahore')}>{type.name} in {city ?? 'Lahore'}</Link>;
             })}
-            {mockAreas.slice(0, 3).flatMap((area) => {
+            {relatedAreas.slice(0, 3).flatMap((area) => {
               if (!area.slug) return [];
-              return <Link key={area.id} href={getAreaHref(area.slug)}>{area.name}, {area.cityName}</Link>;
+              return <Link key={area.id} href={getAreaHref(area.slug)}>{area.name}{area.cityName ? `, ${area.cityName}` : ''}</Link>;
             })}
           </div>
         </Card>

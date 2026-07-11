@@ -1079,3 +1079,26 @@ The dashboard shows profile completion, verification, current subscription, info
 Admins manage business profiles at `/admin/professionals` through `GET /admin/professionals`, `GET /admin/professionals/:id`, and approve/reject actions. Verification requests reuse the existing `verification_requests` table with type `company`; profile approval synchronizes pending requests and notifies the account owner.
 
 Deploy the `professional_profiles` migration with `npm run prisma:deploy`. Public agency pages, team members/permissions, lead assignment, CRM pipelines, hard quota enforcement, document KYC, and a dedicated professional-logo upload endpoint are intentionally deferred. The setup form accepts an existing hosted logo URL until a generic profile-media S3 flow is introduced.
+
+## SEO, content automation, and discoverability
+
+Reusable SEO helpers live in `apps/web/lib/seo`. They centralize canonical paths, metadata templates, Open Graph/Twitter cards, human-readable route labels, breadcrumb data, FAQ markup, and Schema.org builders for the homepage, listings, projects, blogs, and future professional pages.
+
+Public search combinations remain route-driven rather than generated as static source files:
+
+- `/buy/:city` and `/rent/:city`
+- `/buy/:propertyType`
+- `/buy/:propertyType/:city`
+- `/projects/:city`
+- `/area/:slug`
+- `/blog/category/:slug`
+
+Search landing pages use real reference, area, listing, project, and WordPress data for related links. FAQ templates avoid unsupported market statistics. Listing, project, area, and blog pages connect users to their city/area, similar inventory, nearby projects, guides, categories, and primary marketplace searches.
+
+`/sitemap.xml` refreshes hourly and includes public static routes, cities, areas, property types, popular route combinations, active listings/projects returned by public search, WordPress posts, and normalized WordPress categories. Private, draft, archived, and deleted content is not requested from private inventory APIs. `robots.txt` blocks admin, dashboard, API, authentication, password, and payment paths; private layouts also emit `noindex` metadata.
+
+Structured data includes `WebSite`, `Organization`, `SearchAction`, `RealEstateListing`, `Residence`, `Offer`, `BlogPosting`, `FAQPage`, and matching `BreadcrumbList` markup. Test generated HTML with Google Rich Results and Schema.org validators after deployment because eligibility and warnings can change independently of valid markup.
+
+New and updated listing/project records already enqueue search-index updates through the existing backend services. Sitemap inclusion is automatic after an item becomes publicly searchable; no separate SEO publishing step is required.
+
+Future work: dedicated sitemap index splitting beyond 50,000 URLs, public agency/profile routes using the prepared professional metadata helper, market-statistics content backed by an audited data source, WordPress popularity analytics, and production Lighthouse/Rich Results measurements against the deployed domain.

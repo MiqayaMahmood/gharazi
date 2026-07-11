@@ -16,7 +16,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
   return (
     <Card className="overflow-hidden">
       <Link href={detailsHref} aria-label={`View details for ${listing.title}`} className="relative block aspect-[4/3] bg-stone-200">
-        {listing.coverImageUrl ? <Image src={listing.coverImageUrl} alt="" fill className="object-cover" sizes="(min-width: 768px) 33vw, 100vw" /> : null}
+        {listing.coverImageUrl ? <Image src={listing.coverImageUrl} alt={`${listing.title} in ${listing.areaName}, ${listing.cityName}`} fill className="object-cover" sizes="(min-width: 768px) 33vw, 100vw" /> : null}
         {listing.verificationStatus === 'verified' ? <Badge className="absolute left-3 top-3">Verified</Badge> : null}
       </Link>
       <div className="grid gap-3 p-4">
