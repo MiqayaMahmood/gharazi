@@ -23,6 +23,14 @@ export class ListingContactUpdatesQueryDto {
   @IsString()
   @MaxLength(120)
   q?: string;
+
+  @IsOptional()
+  @IsIn(['title', 'contactName', 'contactPhone', 'contactWhatsapp', 'createdAt', 'updatedAt'])
+  sortBy?: 'title' | 'contactName' | 'contactPhone' | 'contactWhatsapp' | 'createdAt' | 'updatedAt';
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortOrder?: 'asc' | 'desc';
 }
 
 export class UpdateListingContactDto {

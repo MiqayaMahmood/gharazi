@@ -19,6 +19,15 @@ import { ProfessionalService } from '../professional/professional.service';
 import { AdminRoleDto, CreateAdminUserDto } from './dto/admin-users.dto';
 import { ListingContactUpdatesQueryDto, UpdateListingContactDto } from './dto/listing-contact-update.dto';
 
+const LISTING_CONTACT_SORT_FIELDS = {
+  title: 'title',
+  contactName: 'contactName',
+  contactPhone: 'contactPhone',
+  contactWhatsapp: 'contactWhatsapp',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+} as const;
+
 @Injectable()
 export class AdminOperationsService {
   constructor(
@@ -304,12 +313,18 @@ export class AdminOperationsService {
       };
       where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), q];
     }
+    const sortField = query.sortBy ? LISTING_CONTACT_SORT_FIELDS[query.sortBy] : undefined;
+    const orderBy: Prisma.ListingOrderByWithRelationInput[] = sortField
+      ? [{ [sortField]: query.sortOrder ?? 'asc' }, { id: 'asc' }]
+      : [{ updatedAt: 'desc' }];
 
     const [items, total] = await Promise.all([
       this.prisma.listing.findMany({
         where,
         select: this.listingContactSelect(),
-        orderBy: { updatedAt: 'desc' },
+        // Nullable contact fields follow the database's existing null ordering.
+        // The id tie-breaker keeps pagination stable for equal sort values.
+        orderBy,
         skip: (page - 1) * limit,
         take: limit,
       }),

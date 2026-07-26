@@ -11,6 +11,8 @@ import {
   listAdminListingContactUpdates,
   updateAdminListingContact,
   type ListingContactUpdateRow,
+  type ListingContactSortBy,
+  type ListingContactSortOrder,
 } from '@/lib/api/admin';
 import { getUserFriendlyErrorMessage } from '@/lib/api/mock-fallback';
 import { isAdmin } from '@/lib/auth/roles';
@@ -50,10 +52,13 @@ export default function AdminListingContactUpdatePage() {
   const [limit, setLimit] = useState<(typeof PAGE_SIZES)[number]>(20);
   const [searchDraft, setSearchDraft] = useState('');
   const [q, setQ] = useState('');
+  const [sortBy, setSortBy] = useState<ListingContactSortBy | undefined>();
+  const [sortOrder, setSortOrder] = useState<ListingContactSortOrder | undefined>();
   const [rows, setRows] = useState<ListingContactUpdateRow[]>([]);
   const [edits, setEdits] = useState<Record<string, EditableFields>>({});
   const [activeRowId, setActiveRowId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [markingId, setMarkingId] = useState<string | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
 
@@ -68,8 +73,8 @@ export default function AdminListingContactUpdatePage() {
   }, []);
 
   const query = useQuery({
-    queryKey: ['admin', 'listing-contact-updates', filter, page, limit, q],
-    queryFn: () => listAdminListingContactUpdates({ filter, page, limit, q }),
+    queryKey: ['admin', 'listing-contact-updates', filter, page, limit, q, sortBy, sortOrder],
+    queryFn: () => listAdminListingContactUpdates({ filter, page, limit, q, sortBy, sortOrder }),
     enabled: allowed,
   });
 
@@ -112,6 +117,32 @@ export default function AdminListingContactUpdatePage() {
     setRowErrors((current) => ({ ...current, [id]: '' }));
   }
 
+  function changeSort(field: ListingContactSortBy) {
+    if (!confirmDiscard()) return;
+    setSortOrder(sortBy === field && sortOrder === 'asc' ? 'desc' : 'asc');
+    setSortBy(field);
+    setPage(1);
+    setMessage('');
+  }
+
+  function sortableHeader(field: ListingContactSortBy, label: string) {
+    const active = sortBy === field;
+    const indicator = active ? (sortOrder === 'desc' ? '▼' : '▲') : '↕';
+    return (
+      <th className="px-3 py-3" aria-sort={active ? (sortOrder === 'desc' ? 'descending' : 'ascending') : 'none'}>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 font-bold hover:text-ink"
+          onClick={() => changeSort(field)}
+          title={`Sort by ${label}`}
+          aria-label={`Sort by ${label}${active ? `, currently ${sortOrder === 'desc' ? 'descending' : 'ascending'}` : ''}`}
+        >
+          {label} <span aria-hidden="true">{indicator}</span>
+        </button>
+      </th>
+    );
+  }
+
   async function save(row: ListingContactUpdateRow) {
     const edited = edits[row.id] ?? editableFields(row);
     setSavingId(row.id);
@@ -131,6 +162,30 @@ export default function AdminListingContactUpdatePage() {
       setRowErrors((current) => ({ ...current, [row.id]: getUserFriendlyErrorMessage(error) }));
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function mark404(row: ListingContactUpdateRow) {
+    if (markingId || row.contactName === '404') return;
+    if (!window.confirm('Mark this listing as invalid by setting Contact Name to 404?')) return;
+    setMarkingId(row.id);
+    setMessage('');
+    setRowErrors((current) => ({ ...current, [row.id]: '' }));
+    try {
+      const updated = await updateAdminListingContact(row.id, { contactName: '404' });
+      setRows((current) => current.map((item) => (item.id === row.id ? updated : item)));
+      setEdits((current) => ({
+        ...current,
+        [row.id]: {
+          ...(current[row.id] ?? editableFields(updated)),
+          contactName: updated.contactName,
+        },
+      }));
+      setMessage(`Marked ${updated.publicId} as 404 / Invalid.`);
+    } catch (error) {
+      setRowErrors((current) => ({ ...current, [row.id]: getUserFriendlyErrorMessage(error) }));
+    } finally {
+      setMarkingId(null);
     }
   }
 
@@ -229,19 +284,20 @@ export default function AdminListingContactUpdatePage() {
             <thead className="bg-stone-100 text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-3 py-3">Public ID</th>
-                <th className="px-3 py-3">Title</th>
+                {sortableHeader('title', 'Title')}
                 <th className="px-3 py-3">City / Area</th>
                 <th className="px-3 py-3">Status</th>
-                <th className="px-3 py-3">Contact Name</th>
-                <th className="px-3 py-3">Contact Phone</th>
-                <th className="px-3 py-3">WhatsApp</th>
+                {sortableHeader('contactName', 'Contact Name')}
+                {sortableHeader('contactPhone', 'Contact Phone')}
+                {sortableHeader('contactWhatsapp', 'WhatsApp')}
                 <th className="px-3 py-3">Open Source</th>
                 <th className="px-3 py-3">Save</th>
+                <th className="px-3 py-3">Invalid</th>
               </tr>
             </thead>
             <tbody>
               {query.isLoading ? (
-                <tr><td className="px-3 py-8 text-center text-muted" colSpan={9}>Loading listings...</td></tr>
+                <tr><td className="px-3 py-8 text-center text-muted" colSpan={10}>Loading listings...</td></tr>
               ) : rows.length ? rows.map((row) => {
                 const edited = edits[row.id] ?? editableFields(row);
                 const changed = !sameEditable(edited, editableFields(row));
@@ -260,7 +316,10 @@ export default function AdminListingContactUpdatePage() {
                     <td className="max-w-72 px-3 py-3 font-semibold text-ink">{row.title}</td>
                     <td className="px-3 py-3 text-muted">{row.cityName ?? '-'} / {row.areaName ?? '-'}</td>
                     <td className="px-3 py-3"><span className="rounded-md bg-stone-100 px-2 py-1 text-xs font-bold">{row.status}</span></td>
-                    <td className="px-3 py-3"><Input value={edited.contactName ?? ''} onChange={(event) => updateEdit(row.id, 'contactName', event.target.value)} /></td>
+                    <td className="px-3 py-3">
+                      <Input value={edited.contactName ?? ''} onChange={(event) => updateEdit(row.id, 'contactName', event.target.value)} />
+                      {row.contactName === '404' ? <span className="mt-2 inline-block rounded-md bg-red-100 px-2 py-1 text-xs font-bold text-red-700">404 / Invalid</span> : null}
+                    </td>
                     <td className="px-3 py-3"><Input value={edited.contactPhone ?? ''} onChange={(event) => updateEdit(row.id, 'contactPhone', event.target.value)} /></td>
                     <td className="px-3 py-3">
                       <Input value={edited.contactWhatsapp ?? ''} onChange={(event) => updateEdit(row.id, 'contactWhatsapp', event.target.value)} />
@@ -272,14 +331,26 @@ export default function AdminListingContactUpdatePage() {
                       </Button>
                     </td>
                     <td className="px-3 py-3">
-                      <Button type="button" disabled={!changed || savingId === row.id} onClick={() => save(row)}>
+                      <Button type="button" disabled={!changed || savingId === row.id || markingId === row.id} onClick={() => save(row)}>
                         {savingId === row.id ? 'Saving...' : 'Save'}
+                      </Button>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={row.contactName === '404' || markingId !== null}
+                        onClick={() => mark404(row)}
+                        title={row.contactName === '404' ? 'This listing is already marked 404 / Invalid' : 'Set Contact Name to 404'}
+                        aria-label={`Mark ${row.publicId} as 404 / Invalid`}
+                      >
+                        {markingId === row.id ? 'Updating…' : row.contactName === '404' ? 'Marked 404' : 'Mark 404'}
                       </Button>
                     </td>
                   </tr>
                 );
               }) : (
-                <tr><td className="px-3 py-8 text-center text-muted" colSpan={9}>No listings match the current filters.</td></tr>
+                <tr><td className="px-3 py-8 text-center text-muted" colSpan={10}>No listings match the current filters.</td></tr>
               )}
             </tbody>
           </table>

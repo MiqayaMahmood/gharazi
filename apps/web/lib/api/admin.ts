@@ -34,6 +34,9 @@ export type ListingContactUpdatesResponse = {
   totalPages: number;
 };
 
+export type ListingContactSortBy = 'title' | 'contactName' | 'contactPhone' | 'contactWhatsapp' | 'createdAt' | 'updatedAt';
+export type ListingContactSortOrder = 'asc' | 'desc';
+
 function normalizeList(response: AdminListResponse): AdminRecord[] {
   if (Array.isArray(response)) return response;
   return response.items ?? response.data ?? response.results ?? [];
@@ -75,7 +78,14 @@ export async function listAdminListings(status?: string) {
   return normalizeList(await apiRequest<AdminListResponse>(`/admin/listings${toQueryString({ status })}`));
 }
 
-export async function listAdminListingContactUpdates(filters: { filter?: 'all' | 'missing'; page?: number; limit?: number; q?: string }) {
+export async function listAdminListingContactUpdates(filters: {
+  filter?: 'all' | 'missing';
+  page?: number;
+  limit?: number;
+  q?: string;
+  sortBy?: ListingContactSortBy;
+  sortOrder?: ListingContactSortOrder;
+}) {
   return apiRequest<ListingContactUpdatesResponse>(`/admin/listing-contact-updates${toQueryString(filters)}`);
 }
 
