@@ -7,10 +7,10 @@ import { getAreaHref, getBuyPropertyTypeCityHref, getCityRentHref } from '@/lib/
 const categories = [
   ['Buy Property', '/buy', 'Homes, apartments, plots'],
   ['Rent Property', '/rent', 'Fresh rental inventory'],
-  ['New Projects', '/projects', 'Payment plans and timelines'],
+  // ['New Projects', '/projects', 'Payment plans and timelines'],
   ['Commercial', '/buy?propertyTypeCode=commercial', 'Shops, offices, buildings'],
   ['Plots', '/buy?propertyTypeCode=plot', 'Residential and commercial land'],
-  ['DHA Phase 6 Lahore', getAreaHref('dha-phase-6-lahore'), 'Neighborhood discovery'],
+  // ['DHA Phase 6 Lahore', getAreaHref('dha-phase-6-lahore'), 'Neighborhood discovery'],
 ];
 
 export function TrustStrip() {
@@ -30,7 +30,7 @@ export function QuickCategories() {
   return (
     <section className="mx-auto max-w-7xl px-4 py-8">
       <h2 className="text-2xl font-black">Start with what you need</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {categories.map(([title, href, body]) => (
           <Link key={title} href={href}>
             <Card className="h-full p-4 transition hover:border-trust">

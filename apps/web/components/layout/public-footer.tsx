@@ -21,7 +21,7 @@ export function PublicFooter() {
   return (
     <footer className="border-t border-line bg-white">
       <NewsletterSignupSection />
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 lg:grid-cols-[1.2fr_2fr]">
+      <div className="mx-auto grid max-w-7xl gap-7 px-4 py-8 sm:py-10 lg:grid-cols-[1.2fr_2fr]">
         <div>
           <Link href="/" className="text-xl font-black text-ink">Gharazi.pk</Link>
           <p className="mt-3 max-w-sm text-sm leading-6 text-muted">Pakistan real estate discovery with verified inventory, transparent project information, and safer communication flows.</p>
@@ -29,7 +29,7 @@ export function PublicFooter() {
             {socials.map(([label, href]) => <Link key={label} href={href}>{label}</Link>)}
           </div>
         </div>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-5">
           {columns.map((column) => (
             <div key={column.title}>
               <p className="font-black">{column.title}</p>

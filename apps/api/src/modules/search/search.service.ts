@@ -20,7 +20,7 @@ export class SearchService {
     if (!this.searchEnabled()) return this.searchListingsWithDbFallback(query, 'Search is disabled; using PostgreSQL fallback.');
     try {
       const filters = this.listingFilters(query);
-      console.log("searchListings: ", filters);
+      
       const sort = this.sort(query.sort, { price: 'priceAmount', area: 'areaValue' });
       const response = await this.elasticsearch.search('listings', {
         from: ((query.page ?? 1) - 1) * (query.limit ?? 20),
@@ -36,6 +36,7 @@ export class SearchService {
           priceRanges: { range: { field: 'priceAmount', ranges: [{ to: 5000000 }, { from: 5000000, to: 20000000 }, { from: 20000000 }] } },
         },
       });
+      
       return this.format(response);
     } catch (error) {
       return this.searchListingsWithDbFallback(query, this.searchErrorMessage(error));
@@ -58,6 +59,7 @@ export class SearchService {
           possession: { terms: { field: 'possessionStatus', size: 10 } },
         },
       });
+      
       return this.format(response);
     } catch (error) {
       return this.searchProjectsWithDbFallback(query, this.searchErrorMessage(error));
@@ -97,6 +99,7 @@ export class SearchService {
       });
       const items = this.format(response).items.filter((item: any) => item.id !== base.id && item.publicId !== base.publicId);
       if (items.length) return items;
+      
       return this.similarListingsWithDbFallback(base);
     } catch {
       this.warnDegraded('similar-listings', 'Elasticsearch similar listings degraded; using PostgreSQL fallback.');
@@ -118,6 +121,7 @@ export class SearchService {
           },
         },
       });
+      
       return this.format(response).items;
     } catch {
       this.warnDegraded('similar-projects', 'Elasticsearch similar projects degraded; using PostgreSQL fallback.');
@@ -151,6 +155,7 @@ export class SearchService {
     this.range(filter, 'priceAmount', query.minPrice, query.maxPrice);
     this.range(filter, 'areaValue', query.minArea, query.maxArea);
     this.geo(filter, query);
+    
     return filter;
   }
 
@@ -174,13 +179,14 @@ export class SearchService {
   }
 
   private listingPurposeSlug(query: SearchListingsQueryDto) {
-    console.log("query.purposeSlug: ", query.purposeSlug);
+    
 
     const value = query.purposeSlug ?? query.purpose;
     if (value === 'buy') return 'sale';
     if (value === 'Buy') return 'sale';
     if (value === 'FOR_SALE') return 'sale';
     if (value === 'Sale') return 'sale';
+    if (value === 'sale') return 'sale';
     if (value === 'FOR_RENT') return 'rent';
     if (value === 'Rent') return 'rent';
     if (value === 'rent') return 'rent';
@@ -259,6 +265,7 @@ export class SearchService {
         ],
       } : {}),
     };
+    
     const [total, items] = await this.prisma.$transaction([
       this.prisma.listing.count({ where }),
       this.prisma.listing.findMany({
@@ -276,6 +283,8 @@ export class SearchService {
         take: limit,
       }),
     ]);
+    
+
     return {
       total,
       items: items.map((listing) => ({

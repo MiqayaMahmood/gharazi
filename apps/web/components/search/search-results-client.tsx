@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Badge, InfoChip } from '@/components/ui/badge';
 import { EmptyState, ErrorState, Skeleton } from '@/components/ui/state';
 import { Pagination } from '@/components/ui/pagination';
 import { Sheet } from '@/components/ui/sheet';
-import { defaultFilters, DynamicAdvancedFilters, type FilterValues } from './filter-sidebar';
+import { defaultFilters, MobileFilterPanel, type FilterValues } from './filter-sidebar';
 import { GlobalSearchBar, filterQuery, isUuid } from './global-search-bar';
 import { useListings } from '@/lib/query/hooks';
 import { ListingCard } from '@/components/listings/listing-card';
@@ -32,30 +32,12 @@ const defaultLimit = 20;
 
 export function ListingSearchClient({ purpose }: { purpose: 'buy' | 'rent' }) {
   const searchParams = useSearchParams();
+  const searchParamsKey = searchParams.toString();
   const router = useRouter();
   const queryClient = useQueryClient();
   const page = positiveInt(searchParams.get('page'), 1);
   const limit = positiveInt(searchParams.get('limit'), defaultLimit);
-  const [filters, setFilters] = useState<FilterValues>({
-    ...defaultFilters,
-    q: searchParams.get('q') ?? '',
-    cityId: searchParams.get('cityId') ?? '',
-    location: searchParams.get('location') ?? '',
-    propertyTypeId: searchParams.get('propertyTypeId') ?? searchParams.get('propertyTypeCode') ?? '',
-    minPrice: searchParams.get('minPrice') ?? '',
-    maxPrice: searchParams.get('maxPrice') ?? '',
-    minArea: searchParams.get('minArea') ?? '',
-    maxArea: searchParams.get('maxArea') ?? '',
-    bedrooms: searchParams.get('bedrooms') ?? '',
-    bathrooms: searchParams.get('bathrooms') ?? '',
-    furnishedStatus: searchParams.get('furnishedStatus') ?? '',
-    possessionStatus: searchParams.get('possessionStatus') ?? '',
-    legalStatus: searchParams.get('legalStatus') ?? '',
-    floor: searchParams.get('floor') ?? '',
-    corner: searchParams.get('corner') === 'true',
-    parking: searchParams.get('parking') === 'true',
-    sort: searchParams.get('sort') ?? 'relevant',
-  });
+  const [filters, setFilters] = useState<FilterValues>(() => listingFiltersFromParams(searchParams));
   const [applied, setApplied] = useState(filters);
   const [view, setView] = useState<'list' | 'map'>('list');
   const { mobileFiltersOpen, setMobileFiltersOpen } = useUiStore();
@@ -101,56 +83,61 @@ export function ListingSearchClient({ purpose }: { purpose: 'buy' | 'rent' }) {
     ? `${context.propertyTypeName} for ${purpose === 'rent' ? 'Rent' : 'Sale'}`
     : purpose === 'rent' ? 'Properties for Rent' : 'Properties for Sale';
 
+  useEffect(() => {
+    const next = listingFiltersFromParams(new URLSearchParams(searchParamsKey));
+    setFilters(next);
+    setApplied(next);
+  }, [searchParamsKey]);
+
   function apply(nextFilters = filters) {
     setApplied(nextFilters);
-    replaceQuery(nextFilters, 1, limit);
+    pushQuery(nextFilters, 1, limit);
   }
 
   function clear() {
     setFilters(defaultFilters);
     setApplied(defaultFilters);
-    replaceQuery(defaultFilters, 1, limit);
+    pushQuery(defaultFilters, 1, limit);
   }
 
-  function replaceQuery(nextFilters: FilterValues, nextPage: number, nextLimit: number) {
+  function pushQuery(nextFilters: FilterValues, nextPage: number, nextLimit: number) {
     const params = new URLSearchParams(filterQuery(nextFilters));
     if (nextPage > 1) params.set('page', String(nextPage));
     if (nextLimit !== defaultLimit) params.set('limit', String(nextLimit));
     const queryString = params.toString();
-    router.replace(`/${purpose}${queryString ? `?${queryString}` : ''}`, { scroll: false });
+    router.push(`/${purpose}${queryString ? `?${queryString}` : ''}`, { scroll: false });
   }
 
   function changePage(nextPage: number) {
-    replaceQuery(applied, nextPage, limit);
+    pushQuery(applied, nextPage, limit);
   }
 
   function changeLimit(nextLimit: number) {
-    replaceQuery(applied, 1, nextLimit);
+    pushQuery(applied, 1, nextLimit);
   }
 
   return (
     <>
-      <GlobalSearchBar mode="controlled" initialTab={purpose} values={filters} onChange={setFilters} onSearch={() => apply()} />
-      <div className="mx-auto max-w-7xl px-4 py-6">
-      <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: purpose === 'buy' ? 'Buy' : 'Rent' }]} />
-      <div className="mb-5 grid gap-3">
+      <GlobalSearchBar activeFilterCount={active.length} mode="controlled" initialTab={purpose} values={filters} onChange={setFilters} onSearch={() => apply()} onOpenFilters={() => setMobileFiltersOpen(true)} />
+      <div className="mx-auto max-w-7xl px-4 py-4 sm:py-6">
+      <div className="hidden sm:block"><Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: purpose === 'buy' ? 'Buy' : 'Rent' }]} /></div>
+      <div className="mb-5 hidden gap-3 xl:grid">
         <SearchLandingIntro context={context} />
         <QuickSearchChips context={context} />
       </div>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 sm:mb-5">
         <div>
-          <Badge>{purpose === 'buy' ? 'Buy' : 'Rent'}</Badge>
-          <h1 className="mt-3 text-3xl font-black">{resultTitle} in Pakistan</h1>
-          <p className="mt-1 text-muted">{query.data ? resultSummary(query.data.total, page, limit, 'properties') : 'Verified inventory, fresh updates, and direct inquiry readiness.'}</p>
+          {/* <Badge>{purpose === 'buy' ? 'Buy' : 'Rent'}</Badge>
+          <h1 className="mt-2 text-2xl font-black sm:mt-3 sm:text-3xl">{resultTitle} in Pakistan</h1> */}
+          <p className="mt-1 ml-2 text-muted">{query.data ? resultSummary(query.data.total, page, limit, 'properties') : 'Verified inventory, fresh updates, and direct inquiry readiness.'}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button onClick={() => saveMutation.mutate()} variant="secondary">Save search</Button>
           <Button onClick={() => setView((current) => (current === 'list' ? 'map' : 'list'))} variant="secondary">{view === 'list' ? 'Map view' : 'List view'}</Button>
           {active.length ? <Button onClick={clear} variant="ghost">Clear filters</Button> : null}
-          <Button className="md:hidden" onClick={() => setMobileFiltersOpen(true)} variant="secondary">More filters</Button>
         </div>
       </div>
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex snap-x gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
         {active.map(([key, value]) => <InfoChip key={key}>{key}: {String(value)}</InfoChip>)}
       </div>
       <section>
@@ -176,18 +163,49 @@ export function ListingSearchClient({ purpose }: { purpose: 'buy' | 'rent' }) {
           ) : null}
           <div className="mt-8">{query.data ? <Pagination page={page} total={query.data.total} pageSize={limit} onPageChange={changePage} onPageSizeChange={changeLimit} /> : null}</div>
       </section>
+      <div className="mt-8 grid gap-3 xl:hidden">
+        <SearchLandingIntro context={context} />
+        <QuickSearchChips context={context} />
+      </div>
       <ListingLandingRecommendations context={context} />
       <SuggestedAreasSection context={context} />
       <ContextualToolsSection context={context} />
       <PremiumProfilesSection context={context} />
       <SearchLandingFaq context={context} />
       <Sheet open={mobileFiltersOpen} title="Filters" onClose={() => setMobileFiltersOpen(false)}>
-        <DynamicAdvancedFilters values={filters} onChange={setFilters} />
-        <Button className="mt-4 w-full" onClick={() => { apply(); setMobileFiltersOpen(false); }}>Apply filters</Button>
+        <MobileFilterPanel values={filters} onChange={setFilters} />
+        <div className="sticky bottom-0 mt-5 grid grid-cols-2 gap-2 border-t border-line bg-paper pb-[env(safe-area-inset-bottom)] pt-3">
+          <Button onClick={clear} variant="secondary">Clear</Button>
+          <Button onClick={() => { apply(); setMobileFiltersOpen(false); }}>Apply filters</Button>
+        </div>
       </Sheet>
     </div>
     </>
   );
+}
+
+function listingFiltersFromParams(params: Pick<URLSearchParams, 'get'>): FilterValues {
+  return {
+    ...defaultFilters,
+    q: params.get('q') ?? '',
+    cityId: params.get('cityId') ?? '',
+    location: params.get('location') ?? '',
+    propertyTypeId: params.get('propertyTypeId') ?? params.get('propertyTypeCode') ?? '',
+    minPrice: params.get('minPrice') ?? '',
+    maxPrice: params.get('maxPrice') ?? '',
+    minArea: params.get('minArea') ?? '',
+    maxArea: params.get('maxArea') ?? '',
+    bedrooms: params.get('bedrooms') ?? '',
+    bathrooms: params.get('bathrooms') ?? '',
+    furnishedStatus: params.get('furnishedStatus') ?? '',
+    possessionStatus: params.get('possessionStatus') ?? '',
+    legalStatus: params.get('legalStatus') ?? '',
+    floor: params.get('floor') ?? '',
+    corner: params.get('corner') === 'true',
+    parking: params.get('parking') === 'true',
+    verifiedOnly: params.get('verifiedOnly') === 'true',
+    sort: params.get('sort') ?? 'relevant',
+  };
 }
 
 function readable(value: string) {
@@ -204,5 +222,5 @@ function resultSummary(total: number, page: number, limit: number, label: string
   const start = (page - 1) * limit + 1;
   const end = Math.min(total, page * limit);
   const totalPages = Math.max(1, Math.ceil(total / limit));
-  return `Showing ${start}-${end} of ${total} ${label}. Page ${Math.min(page, totalPages)} of ${totalPages}.`;
+  return ` Showing ${start}-${end} of ${total} ${label}. Page ${Math.min(page, totalPages)} of ${totalPages}.`;
 }

@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { useCompareStore } from '@/stores/ui-store';
 
-export function CompareButton({ type, id }: { type: 'listing' | 'project'; id: string }) {
+export function CompareButton({ type, id, className }: { type: 'listing' | 'project'; id: string; className?: string }) {
   const listingIds = useCompareStore((state) => state.listingIds);
   const projectIds = useCompareStore((state) => state.projectIds);
   const addListing = useCompareStore((state) => state.addListing);
@@ -15,6 +15,7 @@ export function CompareButton({ type, id }: { type: 'listing' | 'project'; id: s
   return (
     <Button
       type="button"
+      className={className}
       variant={selected ? 'primary' : 'secondary'}
       onClick={() => {
         if (type === 'listing') selected ? removeListing(id) : addListing(id);

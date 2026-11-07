@@ -13,28 +13,28 @@ export function ProjectCard({ project }: { project: Project }) {
   const detailsHref = getProjectHref(project);
 
   return (
-    <Card className="overflow-hidden border-sky/20">
+    <Card className="relative overflow-hidden border-sky/20">
       <Link href={detailsHref} aria-label={`View project details for ${project.name}`} className="relative block aspect-[16/10] bg-stone-200">
         {project.coverImageUrl ? <Image src={project.coverImageUrl} alt={`${project.name} project in ${project.areaName}, ${project.cityName}`} fill className="object-cover" sizes="(min-width: 768px) 33vw, 100vw" /> : null}
         {project.legalStatus ? <Badge className="absolute left-3 top-3 bg-sky-50 text-sky">{project.legalStatus}</Badge> : null}
       </Link>
-      <div className="grid gap-3 p-4">
+      <div className="absolute right-3 top-3"><FavoriteButton compact entityType="project" entityId={project.id} /></div>
+      <div className="grid gap-3 p-3.5 sm:p-4">
         <div>
-          <h2 className="text-lg font-black">{project.name}</h2>
+          <p className="text-xl font-black text-ink">{formatPrice(project.minPriceAmount)} onward</p>
+          <h2 className="mt-1 line-clamp-2 text-lg font-black">{project.name}</h2>
           <p className="text-sm font-semibold text-muted">{project.developerName}</p>
-          <p className="mt-1 text-sm text-muted">{project.areaName}, {project.cityName}</p>
+          <p className="mt-1 line-clamp-1 text-sm text-muted">{[project.areaName, project.cityName].filter(Boolean).join(', ')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <InfoChip>{project.projectTypeName ?? 'Project'}</InfoChip>
-          <InfoChip>{project.possessionStatus ?? 'Status pending'}</InfoChip>
-          <InfoChip>{formatPrice(project.minPriceAmount)} onward</InfoChip>
+          {project.possessionStatus ? <InfoChip>{project.possessionStatus}</InfoChip> : null}
         </div>
-        <p className="text-sm text-muted">{project.paymentPlanSummary ?? 'Payment plan details available on request.'}</p>
-        <div className="flex gap-2">
+        {project.paymentPlanSummary ? <p className="line-clamp-2 text-sm text-muted">{project.paymentPlanSummary}</p> : null}
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
           <Button href={detailsHref} asChild className="flex-1">View project</Button>
-          <FavoriteButton entityType="project" entityId={project.id} />
+          <CompareButton className="min-w-24" type="project" id={project.id} />
         </div>
-        <CompareButton type="project" id={project.id} />
       </div>
     </Card>
   );

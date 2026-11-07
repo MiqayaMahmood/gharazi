@@ -118,9 +118,9 @@ export function ListingFormClient({ initialListing }: { initialListing?: Listing
   }
 
   return (
-    <form className="grid gap-6" onSubmit={form.handleSubmit((data) => saveMutation.mutate(data))}>
+    <form className="grid gap-5 sm:gap-6" onSubmit={form.handleSubmit((data) => saveMutation.mutate(data))}>
       <Stepper steps={steps} current={step} />
-      <Card className="p-5">
+      <Card className="p-4 sm:p-5">
         {step === 0 ? (
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Purpose" help="Choose whether this property is for sale or rent. This controls where buyers or tenants find it." error={form.formState.errors.purposeId?.message}><Select {...form.register('purposeId')}><option value="">Select purpose</option>{purposes.data?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></Field>
@@ -137,7 +137,7 @@ export function ListingFormClient({ initialListing }: { initialListing?: Listing
         {step === 2 ? (
           <div className="grid gap-4">
             <Field label="Title" error={form.formState.errors.title?.message}><Input {...form.register('title')} placeholder="10 Marla verified house near park" /></Field>
-            <Field label="Description" error={form.formState.errors.description?.message}><textarea className="min-h-36 w-full rounded-md border border-line bg-white p-3 text-sm" {...form.register('description')} /></Field>
+            <Field label="Description" error={form.formState.errors.description?.message}><textarea className="min-h-36 w-full rounded-md border border-line bg-white p-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-trust" {...form.register('description')} /></Field>
             <div className="grid gap-4 md:grid-cols-4">
               <Field label="Bedrooms"><Input type="number" {...form.register('bedrooms')} /></Field>
               <Field label="Bathrooms"><Input type="number" {...form.register('bathrooms')} /></Field>

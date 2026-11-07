@@ -42,16 +42,16 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     <JsonLd data={projectSchemas(project)} />
     <ViewTracker eventType="project_viewed" entityType="project" entityId={project.id} metadataJson={{ slug: project.slug }} />
     <GlobalSearchBar initialTab="projects" compact />
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      <Breadcrumbs items={[
+    <div className="mx-auto max-w-7xl px-4 py-5 sm:py-8">
+      <div className="hidden sm:block"><Breadcrumbs items={[
         { label: 'Home', href: '/' },
         { label: 'Projects', href: '/projects' },
         { label: project.cityName, href: cityHref },
         { label: project.areaName, href: areaHref },
         { label: project.name },
-      ]} />
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
-        <div className="grid gap-6">
+      ]} /></div>
+      <div className="grid gap-5 lg:grid-cols-[1fr_360px] lg:items-start lg:gap-6">
+        <div className="grid gap-5 sm:gap-6">
           <div className="relative aspect-[16/9] overflow-hidden rounded-xl bg-stone-200">
             {project.coverImageUrl ? <Image src={project.coverImageUrl} alt={`${project.name} in ${project.areaName}, ${project.cityName}`} fill className="object-cover" priority sizes="(min-width: 1024px) 820px, 100vw" /> : null}
           </div>
@@ -61,13 +61,14 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               {project.legalStatus ? <Badge className="bg-sky-50 text-sky">{project.legalStatus}</Badge> : null}
               {project.possessionStatus ? <InfoChip>{project.possessionStatus}</InfoChip> : null}
             </div>
-            <h1 className="mt-4 text-3xl font-black">{project.name}</h1>
+            <h1 className="mt-3 text-2xl font-black sm:mt-4 sm:text-3xl">{project.name}</h1>
             <p className="mt-2 text-lg font-bold text-muted">{project.developerName}</p>
             <p className="mt-1 text-muted">{project.areaName}, {project.cityName}</p>
-            <div className="mt-4 flex flex-wrap gap-2"><CompareButton type="project" id={project.id} /></div>
+            {project.minPriceAmount ? <p className="mt-2 text-2xl font-black text-trust">{formatPrice(project.minPriceAmount)} onward</p> : null}
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:flex"><Button href="#inquiry" asChild className="lg:hidden">Request details</Button><CompareButton type="project" id={project.id} /></div>
           </section>
           <ProjectDisclaimer />
-          <Card className="p-5"><h2 className="text-xl font-black">Project overview</h2><p className="mt-3 leading-7 text-muted">{project.description}</p></Card>
+          <Card className="p-4 sm:p-5"><h2 className="text-xl font-black">Project overview</h2><p className="mt-3 whitespace-pre-line break-words leading-7 text-muted">{project.description}</p></Card>
           <InvestmentSummary project={project} />
           <div className="grid gap-3 md:grid-cols-3">
             <Card className="p-4"><p className="text-sm text-muted">Starting from</p><p className="text-xl font-black">{formatPrice(project.minPriceAmount)}</p></Card>

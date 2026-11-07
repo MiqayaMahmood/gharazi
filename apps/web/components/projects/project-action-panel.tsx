@@ -28,7 +28,7 @@ export function ProjectActionPanel({ project }: { project: Project }) {
   }
 
   return (
-    <div className="grid gap-3 self-start lg:sticky lg:top-24">
+    <div id="inquiry" className="grid scroll-mt-36 gap-3 self-start lg:sticky lg:top-24">
       <Card className="p-4">
         <div className="grid gap-3">
           <div>
@@ -47,7 +47,7 @@ export function ProjectActionPanel({ project }: { project: Project }) {
 function LoggedOutProjectPrompt() {
   const returnTo = typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}#inquiry` : '/';
   return (
-    <Card id="inquiry" className="self-start p-4 lg:sticky lg:top-24">
+    <Card id="inquiry" className="scroll-mt-36 self-start p-4 lg:sticky lg:top-24">
       <div className="grid gap-4">
         <div>
           <h2 className="text-lg font-black">Request project details</h2>
@@ -81,7 +81,7 @@ function OwnerProjectActionPanel({ project, isAdmin }: { project: Project; isAdm
   });
 
   return (
-    <Card id="inquiry" className="self-start p-4 lg:sticky lg:top-24">
+    <Card id="inquiry" className="scroll-mt-36 self-start p-4 lg:sticky lg:top-24">
       <div className="grid gap-4">
         <div>
           <h2 className="text-lg font-black">Manage project</h2>

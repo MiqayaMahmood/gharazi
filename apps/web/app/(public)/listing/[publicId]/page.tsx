@@ -45,16 +45,16 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
     <JsonLd data={listingSchemas(listing)} />
     <ViewTracker eventType="listing_viewed" entityType="listing" entityId={listing.id} metadataJson={{ publicId: listing.publicId }} />
     <GlobalSearchBar initialTab={isRent ? 'rent' : 'buy'} compact />
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      <Breadcrumbs items={[
+    <div className="mx-auto max-w-7xl px-4 py-5 sm:py-8">
+      <div className="hidden sm:block"><Breadcrumbs items={[
         { label: 'Home', href: '/' },
         { label: purposeLabel, href: isRent ? '/rent' : '/buy' },
         { label: listing.cityName, href: cityHref },
         { label: listing.areaName, href: areaHref },
         { label: listing.publicId },
-      ]} />
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
-        <div className="grid gap-6">
+      ]} /></div>
+      <div className="grid gap-5 lg:grid-cols-[1fr_360px] lg:items-start lg:gap-6">
+        <div className="grid gap-5 sm:gap-6">
           <ListingGallery images={listing.images} title={listing.title} />
           <section>
             <div className="flex flex-wrap gap-2">
@@ -62,19 +62,19 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
               {listing.isFeatured ? <Badge className="bg-amber-50 text-saffron">Featured</Badge> : null}
               <InfoChip>Updated {formatDate(listing.updatedAt)}</InfoChip>
             </div>
-            <h1 className="mt-4 text-3xl font-black">{listing.title}</h1>
+            <h1 className="mt-3 text-2xl font-black sm:mt-4 sm:text-3xl">{listing.title}</h1>
             <p className="mt-2 text-2xl font-black text-trust">{formatPrice(listing.priceAmount)}</p>
             <p className="mt-2 text-muted">{areaHref ? <a className="font-semibold text-trust" href={areaHref}>{listing.areaName}</a> : listing.areaName}, <a className="font-semibold text-trust" href={cityHref}>{listing.cityName}</a></p>
-            <div className="mt-4 flex flex-wrap gap-2"><CompareButton type="listing" id={listing.id} /></div>
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:flex"><Button href="#inquiry" asChild className="lg:hidden">Contact seller</Button><CompareButton type="listing" id={listing.id} /></div>
           </section>
           <ListingDisclaimer />
-          <div className="grid gap-3 sm:grid-cols-4">
-            <Card className="p-4"><p className="text-sm text-muted">Beds</p><p className="text-xl font-black">{listing.bedrooms ?? '-'}</p></Card>
-            <Card className="p-4"><p className="text-sm text-muted">Baths</p><p className="text-xl font-black">{listing.bathrooms ?? '-'}</p></Card>
-            <Card className="p-4"><p className="text-sm text-muted">Area</p><p className="text-xl font-black">{listing.areaValue} {listing.areaUnit}</p></Card>
-            <Card className="p-4"><p className="text-sm text-muted">Type</p><p className="text-xl font-black">{listing.propertyTypeName}</p></Card>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Card className="p-3 sm:p-4"><p className="text-sm text-muted">Beds</p><p className="text-xl font-black">{listing.bedrooms ?? '-'}</p></Card>
+            <Card className="p-3 sm:p-4"><p className="text-sm text-muted">Baths</p><p className="text-xl font-black">{listing.bathrooms ?? '-'}</p></Card>
+            <Card className="p-3 sm:p-4"><p className="text-sm text-muted">Area</p><p className="text-xl font-black">{listing.areaValue ?? '-'} {listing.areaUnit ?? ''}</p></Card>
+            <Card className="p-3 sm:p-4"><p className="text-sm text-muted">Type</p><p className="text-xl font-black">{listing.propertyTypeName ?? '-'}</p></Card>
           </div>
-          <Card className="p-5"><h2 className="text-xl font-black">Description</h2><p className="mt-3 leading-7 text-muted">{listing.description}</p></Card>
+          <Card className="p-4 sm:p-5"><h2 className="text-xl font-black">Description</h2><p className="mt-3 whitespace-pre-line break-words leading-7 text-muted">{listing.description}</p></Card>
           <Card className="p-5">
             <h2 className="text-xl font-black">Amenities</h2>
             {listing.amenities?.length ? (

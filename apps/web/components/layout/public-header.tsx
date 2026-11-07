@@ -78,8 +78,8 @@ export function PublicHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-paper/95 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-              <Link href="/" className="text-lg font-black tracking-normal text-ink">Gharazi.pk</Link>
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:h-16">
+        <Link href="/" className="text-base font-black tracking-normal text-ink sm:text-lg">Gharazi.pk</Link>
         <nav className="hidden items-center gap-5 text-sm font-semibold text-muted lg:flex">
           {nav.map(([label, href]) => <Link key={label} href={href} className="hover:text-ink">{label}</Link>)}
         </nav>
@@ -100,7 +100,10 @@ export function PublicHeader() {
           )}
           <Button href={user ? '/dashboard/listings/new' : '/login?next=/dashboard/listings/new'} asChild>Post Property</Button>
         </div>
-        <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold lg:hidden" onClick={() => setMobileMenuOpen(true)} type="button">Menu</button>
+        <div className="flex items-center gap-2 lg:hidden">
+          <Button href={user ? '/dashboard/listings/new' : '/login?next=/dashboard/listings/new'} asChild className="px-3">Post Ad</Button>
+          <button className="min-h-11 rounded-md border border-line px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-trust" onClick={() => setMobileMenuOpen(true)} type="button">Menu</button>
+        </div>
       </div>
       <Sheet open={mobileMenuOpen} title="Navigation" onClose={() => setMobileMenuOpen(false)}>
         <div className="grid gap-2">

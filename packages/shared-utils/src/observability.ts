@@ -13,7 +13,7 @@ function isTelemetryEnabled(): boolean {
 
 export async function startTelemetry(serviceName: string): Promise<void> {
   if (!isTelemetryEnabled()) {
-    console.log('OpenTelemetry disabled');
+    
     return;
   }
 

@@ -109,6 +109,10 @@ Use a long random value for `JWT_SECRET` before running outside local developmen
 ```bash
 npm run start:api:dev
 npm run start:worker:dev
+
+
+
+
 ```
 
 API defaults to `http://localhost:3001`.

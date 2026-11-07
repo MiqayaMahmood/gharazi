@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Badge, InfoChip } from '@/components/ui/badge';
 import { EmptyState, ErrorState, Skeleton } from '@/components/ui/state';
 import { Pagination } from '@/components/ui/pagination';
 import { Sheet } from '@/components/ui/sheet';
-import { defaultFilters, DynamicAdvancedFilters, type FilterValues } from './filter-sidebar';
+import { defaultFilters, MobileFilterPanel, type FilterValues } from './filter-sidebar';
 import { GlobalSearchBar, filterQuery, isUuid } from './global-search-bar';
 import { useProjects } from '@/lib/query/hooks';
 import { ProjectCard } from '@/components/projects/project-card';
@@ -31,28 +31,10 @@ const defaultLimit = 20;
 
 export function ProjectResultsClient() {
   const searchParams = useSearchParams();
+  const searchParamsKey = searchParams.toString();
   const page = positiveInt(searchParams.get('page'), 1);
   const limit = positiveInt(searchParams.get('limit'), defaultLimit);
-  const [filters, setFilters] = useState<FilterValues>({
-    ...defaultFilters,
-    q: searchParams.get('q') ?? '',
-    cityId: searchParams.get('cityId') ?? '',
-    location: searchParams.get('location') ?? '',
-    propertyTypeId: searchParams.get('projectTypeId') ?? searchParams.get('projectTypeCode') ?? searchParams.get('propertyTypeId') ?? searchParams.get('propertyTypeCode') ?? '',
-    minPrice: searchParams.get('minPrice') ?? '',
-    maxPrice: searchParams.get('maxPrice') ?? '',
-    minArea: searchParams.get('minArea') ?? '',
-    maxArea: searchParams.get('maxArea') ?? '',
-    bedrooms: searchParams.get('bedrooms') ?? '',
-    bathrooms: searchParams.get('bathrooms') ?? '',
-    furnishedStatus: searchParams.get('furnishedStatus') ?? '',
-    possessionStatus: searchParams.get('possessionStatus') ?? '',
-    legalStatus: searchParams.get('legalStatus') ?? '',
-    floor: searchParams.get('floor') ?? '',
-    corner: searchParams.get('corner') === 'true',
-    parking: searchParams.get('parking') === 'true',
-    sort: searchParams.get('sort') ?? 'relevant',
-  });
+  const [filters, setFilters] = useState<FilterValues>(() => projectFiltersFromParams(searchParams));
   const router = useRouter();
   const queryClient = useQueryClient();
   const [applied, setApplied] = useState(filters);
@@ -92,56 +74,61 @@ export function ProjectResultsClient() {
   });
   const active = Object.entries(applied).filter(([, value]) => Boolean(value) && value !== 'relevant');
 
+  useEffect(() => {
+    const next = projectFiltersFromParams(new URLSearchParams(searchParamsKey));
+    setFilters(next);
+    setApplied(next);
+  }, [searchParamsKey]);
+
   function apply(nextFilters = filters) {
     setApplied(nextFilters);
-    replaceQuery(nextFilters, 1, limit);
+    pushQuery(nextFilters, 1, limit);
   }
 
   function clear() {
     setFilters(defaultFilters);
     setApplied(defaultFilters);
-    replaceQuery(defaultFilters, 1, limit);
+    pushQuery(defaultFilters, 1, limit);
   }
 
-  function replaceQuery(nextFilters: FilterValues, nextPage: number, nextLimit: number) {
+  function pushQuery(nextFilters: FilterValues, nextPage: number, nextLimit: number) {
     const params = new URLSearchParams(filterQuery(nextFilters, true));
     if (nextPage > 1) params.set('page', String(nextPage));
     if (nextLimit !== defaultLimit) params.set('limit', String(nextLimit));
     const queryString = params.toString();
-    router.replace(`/projects${queryString ? `?${queryString}` : ''}`, { scroll: false });
+    router.push(`/projects${queryString ? `?${queryString}` : ''}`, { scroll: false });
   }
 
   function changePage(nextPage: number) {
-    replaceQuery(applied, nextPage, limit);
+    pushQuery(applied, nextPage, limit);
   }
 
   function changeLimit(nextLimit: number) {
-    replaceQuery(applied, 1, nextLimit);
+    pushQuery(applied, 1, nextLimit);
   }
 
   return (
     <>
-      <GlobalSearchBar mode="controlled" initialTab="projects" values={filters} onChange={setFilters} onSearch={() => apply()} />
-      <div className="mx-auto max-w-7xl px-4 py-6">
-      <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Projects' }]} />
-      <div className="mb-5 grid gap-3">
+      <GlobalSearchBar activeFilterCount={active.length} mode="controlled" initialTab="projects" values={filters} onChange={setFilters} onSearch={() => apply()} onOpenFilters={() => setMobileFiltersOpen(true)} />
+      <div className="mx-auto max-w-7xl px-4 py-4 sm:py-6">
+      <div className="hidden sm:block"><Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Projects' }]} /></div>
+      <div className="mb-5 hidden gap-3 xl:grid">
         <SearchLandingIntro context={context} />
         <QuickSearchChips context={context} />
       </div>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 sm:mb-5">
         <div>
           <Badge className="bg-sky-50 text-sky">New projects</Badge>
-          <h1 className="mt-3 text-3xl font-black">New Projects in Pakistan</h1>
+          <h1 className="mt-2 text-2xl font-black sm:mt-3 sm:text-3xl">New Projects in Pakistan</h1>
           <p className="mt-1 text-muted">{query.data ? resultSummary(query.data.total, page, limit, 'projects') : 'Compare developers, payment plans, possession status, and legal signals.'}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button onClick={() => saveMutation.mutate()} variant="secondary">Save search</Button>
           <Button onClick={() => setView((current) => (current === 'list' ? 'map' : 'list'))} variant="secondary">{view === 'list' ? 'Map view' : 'List view'}</Button>
           {active.length ? <Button onClick={clear} variant="ghost">Clear filters</Button> : null}
-          <Button className="md:hidden" onClick={() => setMobileFiltersOpen(true)} variant="secondary">More filters</Button>
         </div>
       </div>
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex snap-x gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
         {active.map(([key, value]) => <InfoChip key={key}>{key}: {String(value)}</InfoChip>)}
       </div>
       <section>
@@ -163,18 +150,49 @@ export function ProjectResultsClient() {
           {query.data && view === 'list' ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{query.data.items.map((project) => <ProjectCard key={project.id} project={project} />)}</div> : null}
           <div className="mt-8">{query.data ? <Pagination page={page} total={query.data.total} pageSize={limit} onPageChange={changePage} onPageSizeChange={changeLimit} /> : null}</div>
       </section>
+      <div className="mt-8 grid gap-3 xl:hidden">
+        <SearchLandingIntro context={context} />
+        <QuickSearchChips context={context} />
+      </div>
       <ProjectLandingRecommendations context={context} />
       <SuggestedAreasSection context={context} />
       <ContextualToolsSection context={context} />
       <PremiumProfilesSection context={context} />
       <SearchLandingFaq context={context} />
       <Sheet open={mobileFiltersOpen} title="Project filters" onClose={() => setMobileFiltersOpen(false)}>
-        <DynamicAdvancedFilters projectMode values={filters} onChange={setFilters} />
-        <Button className="mt-4 w-full" onClick={() => { apply(); setMobileFiltersOpen(false); }}>Apply filters</Button>
+        <MobileFilterPanel projectMode values={filters} onChange={setFilters} />
+        <div className="sticky bottom-0 mt-5 grid grid-cols-2 gap-2 border-t border-line bg-paper pb-[env(safe-area-inset-bottom)] pt-3">
+          <Button onClick={clear} variant="secondary">Clear</Button>
+          <Button onClick={() => { apply(); setMobileFiltersOpen(false); }}>Apply filters</Button>
+        </div>
       </Sheet>
     </div>
     </>
   );
+}
+
+function projectFiltersFromParams(params: Pick<URLSearchParams, 'get'>): FilterValues {
+  return {
+    ...defaultFilters,
+    q: params.get('q') ?? '',
+    cityId: params.get('cityId') ?? '',
+    location: params.get('location') ?? '',
+    propertyTypeId: params.get('projectTypeId') ?? params.get('projectTypeCode') ?? params.get('propertyTypeId') ?? params.get('propertyTypeCode') ?? '',
+    minPrice: params.get('minPrice') ?? '',
+    maxPrice: params.get('maxPrice') ?? '',
+    minArea: params.get('minArea') ?? '',
+    maxArea: params.get('maxArea') ?? '',
+    bedrooms: params.get('bedrooms') ?? '',
+    bathrooms: params.get('bathrooms') ?? '',
+    furnishedStatus: params.get('furnishedStatus') ?? '',
+    possessionStatus: params.get('possessionStatus') ?? '',
+    legalStatus: params.get('legalStatus') ?? '',
+    floor: params.get('floor') ?? '',
+    corner: params.get('corner') === 'true',
+    parking: params.get('parking') === 'true',
+    verifiedOnly: params.get('verifiedOnly') === 'true',
+    sort: params.get('sort') ?? 'relevant',
+  };
 }
 
 function readable(value: string) {

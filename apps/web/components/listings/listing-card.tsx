@@ -12,37 +12,44 @@ import { getListingHref } from '@/lib/routes';
 
 export function ListingCard({ listing }: { listing: Listing }) {
   const detailsHref = getListingHref(listing);
+  const purposeLabel = listing.purposeSlug === 'rent' ? 'For rent' : listing.purposeSlug === 'sale' ? 'For sale' : null;
+  const hasArea = Number(listing.areaValue) > 0 && Boolean(listing.areaUnit);
 
   return (
-    <Card className="overflow-hidden">
-      <Link href={detailsHref} aria-label={`View details for ${listing.title}`} className="relative block aspect-[4/3] bg-stone-200">
+    <Card className="relative overflow-hidden">
+      <Link href={detailsHref} aria-label={`View details for ${listing.title}`} className="relative block aspect-[16/10] bg-stone-200">
         {listing.coverImageUrl ? <Image src={listing.coverImageUrl} alt={`${listing.title} in ${listing.areaName}, ${listing.cityName}`} fill className="object-cover" sizes="(min-width: 768px) 33vw, 100vw" /> : null}
-        {listing.verificationStatus === 'verified' ? <Badge className="absolute left-3 top-3">Verified</Badge> : null}
+        <div className="absolute left-3 top-3 flex max-w-[calc(100%-4.5rem)] flex-wrap gap-1.5">
+          {purposeLabel ? <Badge>{purposeLabel}</Badge> : null}
+          {listing.isFeatured || listing.isHot ? <Badge className="bg-amber-50 text-amber-900">{listing.isFeatured ? 'Featured' : 'Hot'}</Badge> : null}
+        </div>
       </Link>
-      <div className="grid gap-3 p-4">
+      <div className="absolute right-3 top-3"><FavoriteButton compact entityType="listing" entityId={listing.id} /></div>
+      <div className="grid gap-3 p-3.5 sm:p-4">
         <div>
-          <p className="text-lg font-black text-ink">{formatPrice(listing.priceAmount)}</p>
+          <p className="text-xl font-black text-ink">{formatPrice(listing.priceAmount)}</p>
           <h2 className="mt-1 line-clamp-2 font-bold">{listing.title}</h2>
-          <p className="mt-1 text-sm text-muted">{listing.areaName}, {listing.cityName}</p>
+          <p className="mt-1 line-clamp-1 text-sm text-muted">{[listing.areaName, listing.cityName].filter(Boolean).join(', ')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {listing.propertyTypeName ? <InfoChip>{listing.propertyTypeName}</InfoChip> : null}
           {listing.bedrooms ? <InfoChip>{listing.bedrooms} beds</InfoChip> : null}
           {listing.bathrooms ? <InfoChip>{listing.bathrooms} baths</InfoChip> : null}
-          <InfoChip>{listing.areaValue} {listing.areaUnit}</InfoChip>
-          <InfoChip>{formatDate(listing.updatedAt)}</InfoChip>
+          {hasArea ? <InfoChip>{listing.areaValue} {listing.areaUnit}</InfoChip> : null}
+          {listing.verificationStatus === 'verified' ? <InfoChip>Verified</InfoChip> : null}
         </div>
-        <div className="flex gap-2">
+        {listing.updatedAt ? <p className="text-xs text-muted">Updated {formatDate(listing.updatedAt)}</p> : null}
+        <div className="grid grid-cols-2 gap-2">
           <Button href={detailsHref} asChild className="flex-1">View details</Button>
-          <FavoriteButton entityType="listing" entityId={listing.id} />
+          <AuthActionLink
+            href={`${detailsHref}#inquiry`}
+            className="flex min-h-11 items-center justify-center rounded-md border border-line bg-white px-3 text-center text-sm font-bold text-trust hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-trust"
+            ariaLabel={`Chat or inquire about ${listing.title}`}
+          >
+            Inquire
+          </AuthActionLink>
         </div>
-        <CompareButton type="listing" id={listing.id} />
-        <AuthActionLink
-          href={`${detailsHref}#inquiry`}
-          className="text-left text-sm font-bold text-trust disabled:cursor-not-allowed disabled:opacity-60"
-          ariaLabel={`Chat or inquire about ${listing.title}`}
-        >
-          Chat / inquire
-        </AuthActionLink>
+        <CompareButton className="w-full" type="listing" id={listing.id} />
       </div>
     </Card>
   );

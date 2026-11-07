@@ -136,9 +136,9 @@ export function ProjectFormClient({ initialProject }: { initialProject?: Project
   }
 
   return (
-    <form className="grid gap-6" onSubmit={form.handleSubmit((data) => saveMutation.mutate(data))}>
+    <form className="grid gap-5 sm:gap-6" onSubmit={form.handleSubmit((data) => saveMutation.mutate(data))}>
       <Stepper steps={steps} current={step} />
-      <Card className="p-5">
+      <Card className="p-4 sm:p-5">
         {step === 0 ? (
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Project name" error={form.formState.errors.name?.message}><Input {...form.register('name')} /></Field>
@@ -155,7 +155,7 @@ export function ProjectFormClient({ initialProject }: { initialProject?: Project
         ) : null}
         {step === 2 ? (
           <div className="grid gap-4">
-            <Field label="Overview" error={form.formState.errors.description?.message}><textarea className="min-h-40 w-full rounded-md border border-line p-3 text-sm" {...form.register('description')} /></Field>
+            <Field label="Overview" error={form.formState.errors.description?.message}><textarea className="min-h-40 w-full rounded-md border border-line p-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-trust" {...form.register('description')} /></Field>
             <div className="grid gap-4 md:grid-cols-3">
               <Field label="Possession" error={form.formState.errors.possessionStatus?.message}><Select {...form.register('possessionStatus')}><option value="pre_launch">Pre launch</option><option value="under_construction">Under construction</option><option value="ready">Ready</option><option value="completed">Completed</option><option value="other">Other</option></Select></Field>
               <Field label="Legal status"><Input {...form.register('legalStatus')} placeholder="Approved, NOC submitted" /></Field>

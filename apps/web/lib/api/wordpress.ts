@@ -2,7 +2,7 @@ import { normalizeCategory, normalizeComment, normalizePostDetail, normalizePost
 import type { BlogCategory, BlogComment, BlogListResult, BlogPostDetail, BlogPostSummary, BlogSort, WpCategory, WpComment, WpPost } from '@/lib/wordpress/types';
 
 const DEFAULT_WP_API_BASE = 'https://mydaytogo.com/wp-json/wp/v2';
-const DEFAULT_MAIN_CATEGORY_SLUG = 'sweetnsavour';
+const DEFAULT_MAIN_CATEGORY_SLUG = 'gharazi';
 const REVALIDATE_SECONDS = 600;
 
 type ListPostsOptions = {

@@ -29,7 +29,7 @@ export function ListingActionPanel({ listing }: { listing: Listing }) {
   }
 
   return (
-    <div className="grid gap-3 self-start lg:sticky lg:top-24">
+    <div id="inquiry" className="grid scroll-mt-36 gap-3 self-start lg:sticky lg:top-24">
       <Card className="p-4">
         <div className="grid gap-3">
           <div>
@@ -50,7 +50,7 @@ function LoggedOutContactPrompt() {
   const loginHref = `/login?returnTo=${encodeURIComponent(returnTo)}`;
   const registerHref = `/register?returnTo=${encodeURIComponent(returnTo)}`;
   return (
-    <Card id="inquiry" className="self-start p-4 lg:sticky lg:top-24">
+    <Card id="inquiry" className="scroll-mt-36 self-start p-4 lg:sticky lg:top-24">
       <div className="grid gap-4">
         <div>
           <h2 className="text-lg font-black">Contact owner/agent</h2>
@@ -102,7 +102,7 @@ function OwnerListingActionPanel({ listing, isAdmin }: { listing: Listing; isAdm
   }
 
   return (
-    <Card id="inquiry" className="self-start p-4 lg:sticky lg:top-24">
+    <Card id="inquiry" className="scroll-mt-36 self-start p-4 lg:sticky lg:top-24">
       <div className="grid gap-4">
         <div>
           <h2 className="text-lg font-black">Manage listing</h2>

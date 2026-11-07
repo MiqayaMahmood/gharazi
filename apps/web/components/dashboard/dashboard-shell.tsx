@@ -29,18 +29,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const isProfessional = userRoleCodes(user).some((role) => ['agent', 'developer', 'admin'].includes(role));
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 lg:grid-cols-[260px_1fr]">
+    <div className="mx-auto grid max-w-7xl gap-4 px-4 py-5 sm:py-8 lg:grid-cols-[260px_1fr] lg:gap-6">
       <aside className="lg:sticky lg:top-20 lg:self-start">
         <div className="rounded-lg border border-line bg-white p-3 shadow-soft">
           <div className="border-b border-line p-3">
             <p className="text-sm font-bold">Dashboard</p>
             <p className="mt-1 text-xs text-muted">{user?.phoneNumber ?? 'Authenticated area'}</p>
           </div>
-          <nav className="mt-3 grid gap-1">
+          <nav aria-label="Dashboard sections" className="mt-3 flex gap-1 overflow-x-auto pb-1 lg:grid lg:overflow-visible lg:pb-0">
             {nav.map(([originalLabel, href]) => {
               const label = !isProfessional && href === '/dashboard/professional' ? 'Become a Professional' : !isProfessional && href === '/dashboard/professional/profile' ? 'Create Professional Profile' : originalLabel;
               return (
-              <Link key={href} className={cn('rounded-md px-3 py-2 text-sm font-semibold text-muted hover:bg-emerald-50 hover:text-ink', pathname === href && 'bg-emerald-50 text-trust')} href={href}>
+              <Link key={href} className={cn('min-h-11 shrink-0 rounded-md px-3 py-2 text-sm font-semibold text-muted hover:bg-emerald-50 hover:text-ink', (pathname === href || (href !== '/dashboard' && pathname.startsWith(`${href}/`))) && 'bg-emerald-50 text-trust')} href={href}>
                 {label}
               </Link>
               );

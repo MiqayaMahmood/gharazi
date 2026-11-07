@@ -20,7 +20,7 @@ export const metadata = generateHomeMetadata();
 export default async function HomePage() {
   const [guides, listings, projects] = await Promise.all([
     listLatestBlogPosts(3),
-    searchListings({ sort: 'newest', limit: 3 }).then((response) => response.items).catch((error) => {
+    searchListings({ sort: 'newest', limit: 20 }).then((response) => response.items).catch((error) => {
       if (process.env.NODE_ENV === 'development') console.warn('Homepage listings failed to load from API', error);
       return [];
     }),
@@ -42,7 +42,7 @@ export default async function HomePage() {
 
       <TrustStrip />
       <QuickCategories />
-      <FeaturedAgencies />
+      {/* <FeaturedAgencies /> */}
 
       <section className="mx-auto max-w-7xl px-4 py-8">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
@@ -54,7 +54,7 @@ export default async function HomePage() {
         </div>
         <SponsoredDisclaimer className="mb-4" />
         {listings.length ? (
-          <div className="grid gap-4 md:grid-cols-3">{listings.map((listing) => <ListingCard key={listing.id} listing={listing} />)}</div>
+          <div className="grid gap-4 md:grid-cols-4">{listings.map((listing) => <ListingCard key={listing.id} listing={listing} />)}</div>
         ) : (
           <EmptyState title="No featured listings yet" message="Published listings will appear here once they are available." />
         )}
@@ -63,7 +63,8 @@ export default async function HomePage() {
       <div className="mx-auto max-w-7xl px-4 py-4">
         <InlineAdSlot />
       </div>
-
+      
+      {projects.length ? (
       <section className="mx-auto max-w-7xl px-4 py-8">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -78,6 +79,7 @@ export default async function HomePage() {
           <EmptyState title="No featured projects yet" message="Published projects will appear here once they are available." />
         )}
       </section>
+      ) : null}
 
       <AreaDiscovery />
       <PopularQuickSearches />
@@ -87,10 +89,10 @@ export default async function HomePage() {
       </div>
       <WhyChooseUs />
 
-      <section className="mx-auto max-w-7xl px-4 py-10" id="feedback">
+      <section className="mx-auto max-w-7xl px-4 bg-white py-10" id="feedback">
         <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
           <div>
-            <h2 className="text-2xl font-black">Beta feedback shapes the product</h2>
+            <h2 className="text-2xl font-black">Feedback shapes the product</h2>
             <p className="mt-2 text-muted">Early users can report issues, suggest improvements, and tell us what helps them move from search to inquiry with confidence.</p>
           </div>
           <FeedbackForm compact />

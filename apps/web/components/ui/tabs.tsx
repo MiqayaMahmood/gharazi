@@ -8,7 +8,7 @@ export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: T[]; v
       {tabs.map((tab) => (
         <button
           key={tab}
-          className={cn('rounded-md px-4 py-2 text-sm font-semibold capitalize text-muted', value === tab && 'bg-trust text-white')}
+          className={cn('min-h-11 rounded-md px-4 py-2 text-sm font-semibold capitalize text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-trust', value === tab && 'bg-trust text-white')}
           onClick={() => onChange(tab)}
           type="button"
         >

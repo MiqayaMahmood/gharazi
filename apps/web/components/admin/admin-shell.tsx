@@ -82,7 +82,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <Link
             key={item.href}
             href={item.href}
-            className={cn('flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-muted hover:bg-emerald-50 hover:text-ink', active && 'bg-emerald-50 text-trust')}
+            className={cn('flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-muted hover:bg-emerald-50 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-trust', active && 'bg-emerald-50 text-trust')}
           >
             <AdminIcon name={item.icon} className="h-4 w-4 shrink-0" />
             {item.label}
