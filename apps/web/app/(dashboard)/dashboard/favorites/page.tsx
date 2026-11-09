@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export default function DashboardFavoritesPage() {
   return (
     <div>
-      <h1 className="text-3xl font-black">Favorites</h1>
+      <h1 className="text-2xl font-black sm:text-3xl">Favorites</h1>
       <p className="mt-2 text-muted">Saved listings and projects for quick comparison.</p>
       <div className="mt-6"><FavoritesClient /></div>
     </div>

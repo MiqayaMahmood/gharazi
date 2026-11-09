@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { AuthenticatedUser } from '@Gharazi/shared-types';
 import { makePublicId } from '@Gharazi/shared-utils';
 import { PrismaService } from '../../database/prisma.service';
@@ -6,6 +6,7 @@ import { SearchIndexingService } from '../../common/queues/search-indexing.servi
 import { AddListingMediaDto } from './dto/add-listing-media.dto';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
+import { buildWhatsAppUrl } from './whatsapp';
 
 const PUBLIC_LISTING_STATUSES = ['active', 'sold', 'rented'] as const;
 
@@ -132,7 +133,7 @@ export class ListingsService {
     return {
       contactName: listing.contactName ?? undefined,
       contactPhone: listing.contactPhone ?? undefined,
-      whatsappUrl: listing.contactWhatsapp || listing.contactPhone ? `https://wa.me/${this.normalizePhone(listing.contactWhatsapp ?? listing.contactPhone ?? '')}` : undefined,
+      whatsappUrl: buildWhatsAppUrl(listing.contactWhatsapp),
     };
   }
 
@@ -167,6 +168,9 @@ export class ListingsService {
 
   async publish(userId: string, id: string) {
     const listing = await this.assertCanWrite(userId, id);
+    if (listing.status !== 'draft') {
+      throw new ConflictException(`A listing in ${listing.status} status cannot be published`);
+    }
     this.assertPublishable(listing);
 
     const updated = await this.transition(userId, id, listing.status, 'active', 'Listing published', {
@@ -181,8 +185,11 @@ export class ListingsService {
 
   async archive(user: AuthenticatedUser, id: string) {
     const listing = await this.assertCanManage(user, id);
-    if (['archived', 'expired'].includes(listing.status)) {
+    if (listing.status === 'archived' || listing.status === 'expired') {
       return listing;
+    }
+    if (!['draft', 'active'].includes(listing.status)) {
+      throw new ConflictException(`A listing in ${listing.status} status cannot be archived`);
     }
 
     const updated = await this.transition(user.id, listing.id, listing.status, 'archived', 'Listing archived');
@@ -193,11 +200,20 @@ export class ListingsService {
 
   async refresh(user: AuthenticatedUser, id: string) {
     const listing = await this.assertCanManage(user, id);
-    const updated = await this.prisma.listing.update({
-      where: { id: listing.id },
-      data: { lastRefreshedAt: new Date() },
-      include: this.detailInclude(),
-    });
+    if (listing.status !== 'active') {
+      throw new ConflictException(`A listing in ${listing.status} status cannot be refreshed`);
+    }
+    let updated;
+    try {
+      updated = await this.prisma.listing.update({
+        where: { id: listing.id, status: 'active' },
+        data: { lastRefreshedAt: new Date() },
+        include: this.detailInclude(),
+      });
+    } catch (error) {
+      if (this.isRecordNotFound(error)) throw new ConflictException('Listing status changed; refresh was not applied');
+      throw error;
+    }
 
     if (listing.status === 'active') {
       await this.indexing.indexListing(updated.id, updated.publicId);
@@ -208,6 +224,9 @@ export class ListingsService {
 
   async markStatus(user: AuthenticatedUser, id: string, status: 'sold' | 'rented') {
     const listing = await this.assertCanManage(user, id);
+    if (listing.status !== 'active') {
+      throw new ConflictException(`A listing in ${listing.status} status cannot be marked ${status}`);
+    }
     const updated = await this.transition(user.id, listing.id, listing.status, status, `Listing marked ${status}`);
     await this.indexing.indexListing(updated.id, updated.publicId);
     return updated;
@@ -336,24 +355,33 @@ export class ListingsService {
     reason: string,
     extraData: Record<string, unknown> = {},
   ) {
-    return this.prisma.$transaction(async (tx) => {
-      const listing = await tx.listing.update({
-        where: { id },
-        data: { status: toStatus, ...extraData },
-        include: this.detailInclude(),
-      });
-      await tx.listingStatusHistory.create({
-        data: {
-          listingId: id,
-          fromStatus,
-          toStatus,
-          reason,
-          changedByUserId: userId,
-        },
-      });
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const listing = await tx.listing.update({
+          where: { id, status: fromStatus },
+          data: { status: toStatus, ...extraData },
+          include: this.detailInclude(),
+        });
+        await tx.listingStatusHistory.create({
+          data: {
+            listingId: id,
+            fromStatus,
+            toStatus,
+            reason,
+            changedByUserId: userId,
+          },
+        });
 
-      return listing;
-    });
+        return listing;
+      });
+    } catch (error) {
+      if (this.isRecordNotFound(error)) throw new ConflictException('Listing status changed; transition was not applied');
+      throw error;
+    }
+  }
+
+  private isRecordNotFound(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2025';
   }
 
   private async uniquePublicId(): Promise<string> {
@@ -419,13 +447,6 @@ export class ListingsService {
       amenities: listing.amenities,
       listerRole: 'Owner/agent',
     };
-  }
-
-  private normalizePhone(phone: string) {
-    const digits = phone.replace(/\D/g, '');
-    if (digits.startsWith('00')) return digits.slice(2);
-    if (digits.startsWith('0')) return `92${digits.slice(1)}`;
-    return digits;
   }
 
   private errorSummary(error: unknown) {

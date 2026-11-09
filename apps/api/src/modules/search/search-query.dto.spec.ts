@@ -33,6 +33,13 @@ describe('search query DTOs', () => {
     await expect(validate(dto)).resolves.toHaveLength(0);
   });
 
+  it('normalizes uppercase listing property type codes', async () => {
+    const dto = plainToInstance(SearchListingsQueryDto, { propertyTypeCode: ' HOUSE ' });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.propertyTypeCode).toBe('house');
+  });
+
   it('rejects project type codes in project ID fields with a useful message', async () => {
     const dto = plainToInstance(SearchProjectsQueryDto, { projectTypeId: 'mixed-use' });
 

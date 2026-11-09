@@ -8,6 +8,8 @@ import { ListingCard } from '@/components/listings/listing-card';
 import { ProjectCard } from '@/components/projects/project-card';
 import { ListingGallery } from '@/components/listings/listing-gallery';
 import { ListingActionPanel } from '@/components/listings/listing-action-panel';
+import { MobileListingContactActions } from '@/components/listings/mobile-listing-contact-actions';
+import { FavoriteButton } from '@/components/favorites/favorite-button';
 import { CompareButton } from '@/components/compare/compare-button';
 import { RelatedGuides } from '@/components/content/blog-card';
 import { ViewTracker } from '@/components/analytics/view-tracker';
@@ -17,7 +19,7 @@ import { ListingDisclaimer, SponsoredDisclaimer } from '@/components/legal/discl
 import { listLatestBlogPosts } from '@/lib/api/wordpress';
 import { getListing, getSimilarListings, searchProjects } from '@/lib/api/marketplace';
 import { getAreaHref, getCityBuyHref, getCityRentHref } from '@/lib/routes';
-import { formatDate, formatPrice } from '@/lib/utils';
+import { formatArea, formatDate, formatPrice } from '@/lib/utils';
 import { generateListingMetadata } from '@/lib/seo/seo-templates';
 import { listingSchemas } from '@/lib/seo/structured-data';
 import { JsonLd } from '@/components/seo/json-ld';
@@ -34,11 +36,26 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
   if (!listing) notFound();
   const similarListings = await getSimilarListings(listing.id).catch(() => []);
   const nearbyProjects = await searchProjects({ citySlug: listing.citySlug, areaSlug: listing.areaSlug, limit: 3 }).then((result) => result.items).catch(() => []);
-  const displayedSimilarListings = similarListings.filter((item) => item.publicId !== listing.publicId).slice(0, 3);
+  const displayedSimilarListings = uniqueListings(similarListings).filter((item) => item.id !== listing.id && item.publicId !== listing.publicId).slice(0, 3);
   const isRent = listing.purposeSlug?.toLowerCase().includes('rent');
   const purposeLabel = isRent ? 'Rent' : 'Buy';
   const cityHref = listing.citySlug ? (isRent ? getCityRentHref(listing.citySlug) : getCityBuyHref(listing.citySlug)) : isRent ? '/rent' : '/buy';
   const areaHref = listing.areaSlug ? getAreaHref(listing.areaSlug) : undefined;
+  const areaLabel = formatArea(listing.areaValue, listing.areaUnit);
+  const galleryImages = listing.images?.length
+    ? listing.images
+    : listing.coverImageUrl
+      ? [{ id: `${listing.id}-cover`, url: listing.coverImageUrl, alt: listing.title, isCover: true, sortOrder: 0 }]
+      : [];
+  const propertyFacts = [
+    listing.bedrooms ? { label: 'Bedrooms', value: String(listing.bedrooms) } : undefined,
+    listing.bathrooms ? { label: 'Bathrooms', value: String(listing.bathrooms) } : undefined,
+    areaLabel ? { label: 'Area', value: areaLabel } : undefined,
+    listing.propertyTypeName ? { label: 'Property type', value: listing.propertyTypeName } : undefined,
+    listing.furnishedStatus ? { label: 'Furnishing', value: readable(listing.furnishedStatus) } : undefined,
+    listing.possessionStatus ? { label: 'Possession', value: readable(listing.possessionStatus) } : undefined,
+    listing.floorNumber !== undefined ? { label: 'Floor', value: listing.totalFloors ? `${listing.floorNumber} of ${listing.totalFloors}` : String(listing.floorNumber) } : undefined,
+  ].filter((fact): fact is { label: string; value: string } => Boolean(fact));
 
   return (
     <>
@@ -55,7 +72,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
       ]} /></div>
       <div className="grid gap-5 lg:grid-cols-[1fr_360px] lg:items-start lg:gap-6">
         <div className="grid gap-5 sm:gap-6">
-          <ListingGallery images={listing.images} title={listing.title} />
+          <ListingGallery images={galleryImages} title={listing.title} />
           <section>
             <div className="flex flex-wrap gap-2">
               {listing.verificationStatus === 'verified' ? <Badge>Verified</Badge> : null}
@@ -64,16 +81,16 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
             </div>
             <h1 className="mt-3 text-2xl font-black sm:mt-4 sm:text-3xl">{listing.title}</h1>
             <p className="mt-2 text-2xl font-black text-trust">{formatPrice(listing.priceAmount)}</p>
-            <p className="mt-2 text-muted">{areaHref ? <a className="font-semibold text-trust" href={areaHref}>{listing.areaName}</a> : listing.areaName}, <a className="font-semibold text-trust" href={cityHref}>{listing.cityName}</a></p>
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:flex"><Button href="#inquiry" asChild className="lg:hidden">Contact seller</Button><CompareButton type="listing" id={listing.id} /></div>
+            <p className="mt-2 text-base text-muted">{areaHref ? <a className="font-semibold text-trust" href={areaHref}>{listing.areaName}</a> : listing.areaName}, <a className="font-semibold text-trust" href={cityHref}>{listing.cityName}</a></p>
+            <div className="mt-2"><MobileListingContactActions listingId={listing.id} publicId={listing.publicId} title={listing.title} /></div>
+            {areaLabel || listing.propertyTypeName ? <p className="mt-2 text-sm font-semibold text-muted">{[areaLabel, listing.propertyTypeName].filter(Boolean).join(' · ')}</p> : null}
+            <div className="mt-2 flex flex-wrap gap-2 sm:mt-4">
+              <div className="lg:hidden"><FavoriteButton entityType="listing" entityId={listing.id} /></div>
+              <CompareButton type="listing" id={listing.id} />
+            </div>
           </section>
           <ListingDisclaimer />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Card className="p-3 sm:p-4"><p className="text-sm text-muted">Beds</p><p className="text-xl font-black">{listing.bedrooms ?? '-'}</p></Card>
-            <Card className="p-3 sm:p-4"><p className="text-sm text-muted">Baths</p><p className="text-xl font-black">{listing.bathrooms ?? '-'}</p></Card>
-            <Card className="p-3 sm:p-4"><p className="text-sm text-muted">Area</p><p className="text-xl font-black">{listing.areaValue ?? '-'} {listing.areaUnit ?? ''}</p></Card>
-            <Card className="p-3 sm:p-4"><p className="text-sm text-muted">Type</p><p className="text-xl font-black">{listing.propertyTypeName ?? '-'}</p></Card>
-          </div>
+          {propertyFacts.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">{propertyFacts.map((fact) => <Card key={fact.label} className="p-3 sm:p-4"><p className="text-sm text-muted">{fact.label}</p><p className="mt-1 text-lg font-black sm:text-xl">{fact.value}</p></Card>)}</div> : null}
           <Card className="p-4 sm:p-5"><h2 className="text-xl font-black">Description</h2><p className="mt-3 whitespace-pre-line break-words leading-7 text-muted">{listing.description}</p></Card>
           <Card className="p-5">
             <h2 className="text-xl font-black">Amenities</h2>
@@ -84,10 +101,10 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
             ) : <p className="mt-3 text-sm text-muted">No amenities listed yet.</p>}
           </Card>
           <Card className="p-5"><h2 className="text-xl font-black">Location</h2><div className="mt-3 flex h-52 items-center justify-center rounded-lg bg-stone-100 text-sm font-semibold text-muted">Map placeholder for {listing.areaName}</div></Card>
-          <Card className="p-5"><h2 className="text-xl font-black">Lister</h2><p className="mt-2 font-bold">{listing.listerName}</p><p className="text-sm text-muted">{listing.listerRole}</p><p className="mt-3 text-xs text-muted">Listing ID: {listing.publicId}</p><Button className="mt-4" variant="secondary">Report listing</Button></Card>
+          <Card className="p-4 sm:p-5"><h2 className="text-xl font-black">Listed by</h2>{listing.listerName ? <p className="mt-2 font-bold">{listing.listerName}</p> : null}<p className="mt-1 text-sm text-muted">{listing.listerRole ?? 'Seller information is available in the contact panel.'}</p><p className="mt-3 text-xs text-muted">Listing ID: {listing.publicId}</p><Button className="mt-4" variant="secondary">Report listing</Button></Card>
           <section>
-            <h2 className="mb-4 text-xl font-black">{displayedSimilarListings.some((item) => item.isFeatured) ? 'Featured similar listings' : 'Similar listings'}</h2>
-            <SponsoredDisclaimer className="mb-4" />
+            <h2 className="mb-4 text-xl font-black">Similar properties</h2>
+            {displayedSimilarListings.some((item) => item.isFeatured || item.isHot) ? <SponsoredDisclaimer className="mb-4" /> : null}
             {displayedSimilarListings.length ? (
               <div className="grid gap-4 md:grid-cols-3">{displayedSimilarListings.map((item) => <ListingCard key={item.id} listing={item} />)}</div>
             ) : <EmptyState title="No similar listings yet" message="Related properties will appear here as matching inventory is published." />}
@@ -100,4 +117,12 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
     </div>
     </>
   );
+}
+
+function uniqueListings(listings: Awaited<ReturnType<typeof getSimilarListings>>) {
+  return [...new Map(listings.map((listing) => [listing.id || listing.publicId, listing])).values()];
+}
+
+function readable(value: string) {
+  return value.replace(/[_-]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
 }

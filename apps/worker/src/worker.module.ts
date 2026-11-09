@@ -14,6 +14,10 @@ import { RiskFollowupsProcessor } from './jobs/risk/risk-followups.processor';
 import { SearchDocumentBuilder } from './jobs/search-indexing/search-document.builder';
 import { SearchIndexingProcessor } from './jobs/search-indexing/search-indexing.processor';
 import { WorkerObservabilityService } from './observability/worker-observability.service';
+import { PrismaClient } from '@prisma/client';
+import { PROMOTION_LIFECYCLE_PRISMA } from './jobs/promotions/promotion-lifecycle.constants';
+import { PromotionActivationDeliveryService } from './jobs/promotions/promotion-activation-delivery.service';
+import { PromotionLifecycleService } from './jobs/promotions/promotion-lifecycle.service';
 
 const logger = new Logger('WorkerModule');
 
@@ -55,6 +59,12 @@ const logger = new Logger('WorkerModule');
     SearchDocumentBuilder,
     SavedSearchAlertsProcessor,
     PromotionLifecycleProcessor,
+    {
+      provide: PROMOTION_LIFECYCLE_PRISMA,
+      useFactory: () => new PrismaClient(),
+    },
+    PromotionActivationDeliveryService,
+    PromotionLifecycleService,
     AnalyticsRollupsProcessor,
     PaymentFollowupsProcessor,
     SubscriptionAlertsProcessor,

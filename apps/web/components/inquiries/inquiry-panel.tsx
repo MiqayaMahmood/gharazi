@@ -9,6 +9,8 @@ import { Input, Select } from '@/components/ui/input';
 import { createInquiry } from '@/lib/api/engagement';
 import { getUserFriendlyErrorMessage } from '@/lib/api/mock-fallback';
 import { useCurrentUser, useListingContact } from '@/lib/query/hooks';
+import { buildPropertyWhatsAppHref, buildTelephoneHref } from '@/lib/contact/contact-links';
+import { ContactActionLink } from '@/components/listings/contact-action-link';
 
 const prompts = ['Is this still available?', 'Can I schedule a visit?', 'What is the final price?', 'Please share more details.'];
 
@@ -18,12 +20,14 @@ export function InquiryPanel({
   projectId,
   listerName,
   listerRole,
+  publicId,
 }: {
   subject: string;
   listingId?: string;
   projectId?: string;
   listerName?: string;
   listerRole?: string;
+  publicId?: string;
 }) {
   const router = useRouter();
   const { data: user, isLoading } = useCurrentUser();
@@ -71,6 +75,8 @@ export function InquiryPanel({
   }
 
   const contact = listingContact.data;
+  const callHref = buildTelephoneHref(contact?.contactPhone);
+  const whatsappHref = buildPropertyWhatsAppHref(contact?.whatsappUrl, subject, publicId);
 
   return (
     <Card id="inquiry" className="self-start p-4 lg:sticky lg:top-24">
@@ -86,7 +92,12 @@ export function InquiryPanel({
         {contact?.contactPhone ? <p className="mt-1 text-sm font-semibold text-ink">{contact.contactPhone}</p> : null}
         {!listingContact.isLoading && !contact?.contactPhone ? <p className="mt-1 text-sm text-muted">Phone details are not available for this listing.</p> : null}
       </div>
-      {contact?.whatsappUrl ? <Button href={contact.whatsappUrl} asChild>WhatsApp</Button> : null}
+      {callHref || whatsappHref ? (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+          {callHref ? <ContactActionLink href={callHref} ariaLabel={`Call about ${subject}`}>Call</ContactActionLink> : null}
+          {whatsappHref ? <ContactActionLink href={whatsappHref} ariaLabel={`Open WhatsApp about ${subject}`} external primary>WhatsApp</ContactActionLink> : null}
+        </div>
+      ) : null}
       <Button type="button" onClick={() => setFormOpen((value) => !value)} variant={formOpen ? 'secondary' : 'primary'}>
         {formOpen ? 'Hide inquiry' : 'Send inquiry'}
       </Button>

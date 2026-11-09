@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,8 @@ export function ChatInboxClient() {
   const searchParams = useSearchParams();
   const listingId = searchParams.get('listingId');
   const projectId = searchParams.get('projectId');
-  const [activeId, setActiveId] = useState<string | undefined>();
+  const requestedChatId = searchParams.get('chatId') ?? undefined;
+  const [activeId, setActiveId] = useState<string | undefined>(requestedChatId);
   const [body, setBody] = useState('');
   const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();
@@ -36,15 +37,19 @@ export function ChatInboxClient() {
     },
   });
 
+  useEffect(() => {
+    if (requestedChatId && filteredChats.some((chat) => chat.id === requestedChatId)) setActiveId(requestedChatId);
+  }, [filteredChats, requestedChatId]);
+
   if (chats.isLoading) return <Skeleton className="h-[520px]" />;
   if (chats.isError) return <ErrorState title="Chats failed to load" message="Please retry after refreshing the page." />;
   if (!filteredChats.length) return <EmptyState title="No conversations yet" message="Start an inquiry from a listing or project page to open chat." />;
 
   return (
-    <div className="grid min-h-[560px] overflow-hidden rounded-lg border border-line bg-white shadow-soft lg:grid-cols-[320px_1fr]">
-      <aside className="border-b border-line lg:border-b-0 lg:border-r">
+    <div className="grid min-h-[480px] overflow-hidden rounded-lg border border-line bg-white shadow-soft lg:min-h-[560px] lg:grid-cols-[320px_1fr]">
+      <aside className="max-h-64 overflow-y-auto border-b border-line lg:max-h-none lg:border-b-0 lg:border-r" aria-label="Conversations">
         {filteredChats.map((chat) => (
-          <button key={chat.id} className={`block w-full border-b border-line p-4 text-left hover:bg-emerald-50 ${activeChat?.id === chat.id ? 'bg-emerald-50' : ''}`} type="button" onClick={() => setActiveId(chat.id)}>
+          <button key={chat.id} aria-pressed={activeChat?.id === chat.id} className={`block min-h-16 w-full border-b border-line p-4 text-left hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-trust ${activeChat?.id === chat.id ? 'bg-emerald-50' : ''}`} type="button" onClick={() => setActiveId(chat.id)}>
             <div className="flex items-center justify-between gap-2">
               <p className="font-bold">{chat.contextType ?? 'Conversation'} {chat.id.slice(0, 6)}</p>
               {chat.unread ? <Badge>Unread</Badge> : null}
@@ -54,10 +59,10 @@ export function ChatInboxClient() {
           </button>
         ))}
       </aside>
-      <section className="flex min-h-[560px] flex-col">
+      <section className="flex min-h-[480px] min-w-0 flex-col lg:min-h-[560px]">
         <div className="border-b border-line p-4">
           <h2 className="font-black">Conversation</h2>
-          <p className="text-sm text-muted">{activeChat?.contextType ?? 'general'} context {activeChat?.listingId ?? activeChat?.projectId ?? ''}</p>
+          <p className="break-all text-sm text-muted">{activeChat?.contextType ?? 'general'} context {activeChat?.listingId ?? activeChat?.projectId ?? ''}</p>
         </div>
         <div className="flex-1 space-y-3 overflow-auto bg-stone-50 p-4">
           {messages.isLoading ? <Skeleton className="h-40" /> : null}
@@ -73,9 +78,9 @@ export function ChatInboxClient() {
             );
           })}
         </div>
-        <form className="flex gap-2 border-t border-line p-4" onSubmit={(event) => { event.preventDefault(); if (body.trim() && activeChat?.id) sendMutation.mutate(); }}>
-          <Input value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write a message" />
-          <Button disabled={!body.trim() || sendMutation.isPending}>Send</Button>
+        <form className="flex gap-2 border-t border-line p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4" onSubmit={(event) => { event.preventDefault(); if (body.trim() && activeChat?.id) sendMutation.mutate(); }}>
+          <Input aria-label="Message" value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write a message" />
+          <Button disabled={!body.trim() || sendMutation.isPending}>{sendMutation.isPending ? 'Sending…' : 'Send'}</Button>
         </form>
         {sendMutation.isError ? <div className="border-t border-line p-4"><ErrorAlert error={sendMutation.error} /></div> : null}
       </section>

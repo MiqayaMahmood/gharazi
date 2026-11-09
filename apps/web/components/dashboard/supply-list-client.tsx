@@ -17,6 +17,7 @@ import { CheckoutButton } from '@/components/payments/checkout-button';
 export function MyListingsClient() {
   const queryClient = useQueryClient();
   const [errorText, setErrorText] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const { data = [], isLoading, isError } = useMyListings();
   const action = useMutation({
     mutationFn: ({ id, type }: { id: string; type: 'archive' | 'sold' | 'rented' | 'refresh' }) => {
@@ -31,38 +32,58 @@ export function MyListingsClient() {
   });
   if (isLoading) return <Skeleton className="h-80" />;
   if (isError) return <ErrorState title="Listings failed to load" message="Please retry after refreshing the page." />;
-  if (data.length === 0) return <EmptyState title="No listings yet" message="Add listing flow is planned for the next frontend sprint." />;
+  if (data.length === 0) return <div className="grid gap-3"><EmptyState title="No listings yet" message="Post your first property to create a private draft." /><Button asChild href="/dashboard/listings/new">Post property</Button></div>;
+
+  const statuses = Array.from(new Set(data.map((listing) => listing.status).filter((status): status is string => Boolean(status))));
+  const visibleListings = statusFilter === 'all' ? data : data.filter((listing) => listing.status === statusFilter);
 
   return (
     <div className="grid gap-4">
-      {errorText ? <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{errorText}</p> : null}
-      {data.map((listing) => (
-        <Card key={listing.id} className="p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <Badge>{listing.verificationStatus ?? 'draft/active'}</Badge>
+      <div className="flex max-w-full gap-2 overflow-x-auto pb-1" aria-label="Filter listings by status">
+        <button type="button" aria-pressed={statusFilter === 'all'} onClick={() => setStatusFilter('all')} className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-bold ${statusFilter === 'all' ? 'border-trust bg-trust text-white' : 'border-line bg-white text-ink'}`}>All <span className="ml-1 opacity-80">{data.length}</span></button>
+        {statuses.map((status) => (
+          <button key={status} type="button" aria-pressed={statusFilter === status} onClick={() => setStatusFilter(status)} className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-bold ${statusFilter === status ? 'border-trust bg-trust text-white' : 'border-line bg-white text-ink'}`}>
+            {listingStatusLabel(status)} <span className="ml-1 opacity-80">{data.filter((listing) => listing.status === status).length}</span>
+          </button>
+        ))}
+      </div>
+      {errorText ? <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{errorText}</p> : null}
+      {visibleListings.map((listing) => (
+        <Card key={listing.id} className="p-4 sm:p-5">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+            <div className="min-w-0">
+              <div className="flex flex-wrap gap-2"><Badge>{listingStatusLabel(listing.status)}</Badge>{listing.verificationStatus ? <InfoChip>{listing.verificationStatus}</InfoChip> : null}</div>
               <h2 className="mt-3 text-lg font-black">{listing.title}</h2>
               <p className="mt-1 text-sm text-muted">{listing.areaName}, {listing.cityName} · {formatPrice(listing.priceAmount)}</p>
               <div className="mt-3 flex flex-wrap gap-2"><InfoChip>Updated {formatDate(listing.updatedAt)}</InfoChip><InfoChip>{listing.publicId}</InfoChip></div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button asChild href={getListingHref(listing)} variant="secondary">Preview</Button>
-              <Button asChild href={getDashboardListingEditHref(listing.id)}>Edit</Button>
-              <Button asChild href={`/dashboard/inquiries?listingId=${listing.id}`} variant="secondary">View leads</Button>
-              <Button asChild href={`/dashboard/chats?listingId=${listing.id}`} variant="secondary">Messages</Button>
-              <CheckoutButton payload={{ packageCode: 'listing_hot', entityType: 'listing', entityId: listing.id }} variant="secondary">Make Hot</CheckoutButton>
-              <CheckoutButton payload={{ packageCode: 'listing_super_hot', entityType: 'listing', entityId: listing.id }} variant="secondary">Make Featured</CheckoutButton>
-              <Button type="button" variant="secondary" disabled={action.isPending} onClick={() => action.mutate({ id: listing.id, type: 'refresh' })}>Refresh</Button>
-              <Button type="button" variant="secondary" disabled={action.isPending} onClick={() => window.confirm('Mark this listing sold?') && action.mutate({ id: listing.id, type: 'sold' })}>Mark sold</Button>
-              <Button type="button" variant="secondary" disabled={action.isPending} onClick={() => window.confirm('Mark this listing rented?') && action.mutate({ id: listing.id, type: 'rented' })}>Mark rented</Button>
-              <Button type="button" variant="ghost" disabled={action.isPending} onClick={() => window.confirm('Archive this listing?') && action.mutate({ id: listing.id, type: 'archive' })}>Archive</Button>
+            <div className="grid gap-2 sm:min-w-64">
+              <div className="grid grid-cols-2 gap-2"><Button asChild href={getDashboardListingEditHref(listing.id)}>Edit listing</Button><Button asChild href={getListingHref(listing)} variant="secondary">Preview</Button></div>
+              <div className="grid grid-cols-2 gap-2"><Button asChild href={`/dashboard/inquiries?listingId=${listing.id}`} variant="secondary">View leads</Button><Button asChild href={`/dashboard/chats?listingId=${listing.id}`} variant="secondary">Messages</Button></div>
+              <details className="rounded-md border border-line bg-white p-3">
+                <summary className="min-h-11 cursor-pointer py-2 text-sm font-bold">More listing actions</summary>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <CheckoutButton payload={{ packageCode: 'listing_hot', entityType: 'listing', entityId: listing.id }} variant="secondary">Make Hot</CheckoutButton>
+                  <CheckoutButton payload={{ packageCode: 'listing_super_hot', entityType: 'listing', entityId: listing.id }} variant="secondary">Make Featured</CheckoutButton>
+                  <Button type="button" variant="secondary" disabled={action.isPending} onClick={() => action.mutate({ id: listing.id, type: 'refresh' })}>Refresh</Button>
+                  <Button type="button" variant="secondary" disabled={action.isPending} onClick={() => window.confirm('Mark this listing sold?') && action.mutate({ id: listing.id, type: 'sold' })}>Mark sold</Button>
+                  <Button type="button" variant="secondary" disabled={action.isPending} onClick={() => window.confirm('Mark this listing rented?') && action.mutate({ id: listing.id, type: 'rented' })}>Mark rented</Button>
+                  <Button type="button" variant="ghost" disabled={action.isPending} onClick={() => window.confirm('Archive this listing?') && action.mutate({ id: listing.id, type: 'archive' })}>Archive</Button>
+                </div>
+              </details>
             </div>
           </div>
         </Card>
       ))}
+      {!visibleListings.length ? <EmptyState title="No listings in this status" message="Choose another status to view your properties." /> : null}
       <Link href="/dashboard/listings/new" className="text-sm font-bold text-trust">Add listing</Link>
     </div>
   );
+}
+
+function listingStatusLabel(status?: string) {
+  if (!status) return 'Status unavailable';
+  return status.replace(/[_-]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 export function MyProjectsClient() {

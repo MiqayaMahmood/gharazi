@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Badge, InfoChip } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { formatDate, formatPrice } from '@/lib/utils';
+import { formatArea, formatDate, formatPrice } from '@/lib/utils';
 import type { Listing } from '@/types/marketplace';
 import { FavoriteButton } from '@/components/favorites/favorite-button';
 import { CompareButton } from '@/components/compare/compare-button';
@@ -13,7 +13,7 @@ import { getListingHref } from '@/lib/routes';
 export function ListingCard({ listing }: { listing: Listing }) {
   const detailsHref = getListingHref(listing);
   const purposeLabel = listing.purposeSlug === 'rent' ? 'For rent' : listing.purposeSlug === 'sale' ? 'For sale' : null;
-  const hasArea = Number(listing.areaValue) > 0 && Boolean(listing.areaUnit);
+  const areaLabel = formatArea(listing.areaValue, listing.areaUnit);
 
   return (
     <Card className="relative overflow-hidden">
@@ -35,7 +35,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
           {listing.propertyTypeName ? <InfoChip>{listing.propertyTypeName}</InfoChip> : null}
           {listing.bedrooms ? <InfoChip>{listing.bedrooms} beds</InfoChip> : null}
           {listing.bathrooms ? <InfoChip>{listing.bathrooms} baths</InfoChip> : null}
-          {hasArea ? <InfoChip>{listing.areaValue} {listing.areaUnit}</InfoChip> : null}
+          {areaLabel ? <InfoChip>{areaLabel}</InfoChip> : null}
           {listing.verificationStatus === 'verified' ? <InfoChip>Verified</InfoChip> : null}
         </div>
         {listing.updatedAt ? <p className="text-xs text-muted">Updated {formatDate(listing.updatedAt)}</p> : null}

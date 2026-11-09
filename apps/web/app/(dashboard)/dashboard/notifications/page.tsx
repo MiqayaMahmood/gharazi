@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export default function NotificationsPage() {
   return (
     <div>
-      <h1 className="text-3xl font-black">Notifications</h1>
+      <h1 className="text-2xl font-black sm:text-3xl">Notifications</h1>
       <p className="mt-2 text-muted">Inquiry, chat, verification, moderation, and subscription updates.</p>
       <div className="mt-6"><NotificationsClient /></div>
     </div>

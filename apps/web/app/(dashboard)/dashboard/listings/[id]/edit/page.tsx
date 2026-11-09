@@ -10,9 +10,9 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
   const { id } = await params;
   return (
     <div>
-      <h1 className="text-3xl font-black">Edit listing</h1>
+      <h1 className="text-2xl font-black sm:text-3xl">Edit listing</h1>
       <p className="mt-2 text-muted">Update details, media metadata, contact information, and publish status.</p>
-      <div className="mt-6"><ListingEditLoader id={id} /></div>
+      <div className="mt-4 sm:mt-6"><ListingEditLoader id={id} /></div>
     </div>
   );
 }

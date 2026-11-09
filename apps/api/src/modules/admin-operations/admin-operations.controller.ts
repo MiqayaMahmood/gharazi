@@ -12,6 +12,8 @@ import { UpdateRiskFlagDto } from '../risk/dto/update-risk-flag.dto';
 import { RollupDto } from './dto/rollup.dto';
 import { AdminRoleDto, CreateAdminUserDto } from './dto/admin-users.dto';
 import { ListingContactUpdatesQueryDto, UpdateListingContactDto } from './dto/listing-contact-update.dto';
+import { AdminPromotionGrantDto } from '../promotions/dto/admin-promotion-grant.dto';
+import { AdminReconciliationQueryDto } from '../payments/dto/admin-reconciliation-query.dto';
 import { AdminOperationsService } from './admin-operations.service';
 
 @ApiTags('admin')
@@ -32,6 +34,9 @@ export class AdminOperationsController {
     return this.admin.analyticsSummary({ range, from, to });
   }
   @Get('payments') payments() { return this.admin.payments(); }
+  @Get('payments/reconciliation-required') paymentReconciliationRequired(@Query() query: AdminReconciliationQueryDto) {
+    return this.admin.paymentReconciliationRequired(query);
+  }
   @Get('listings') listings(@Query('status') status?: string) { return this.admin.listings({ status }); }
   @Get('listing-contact-updates')
   @RequireRoles('admin')
@@ -47,6 +52,11 @@ export class AdminOperationsController {
 
   @Get('projects') projects(@Query('status') status?: string) { return this.admin.projects({ status }); }
   @Get('promotions') promotions(@Query('status') status?: string) { return this.admin.promotions({ status }); }
+  @Post('promotions/grants')
+  @RequireRoles('admin')
+  grantPromotion(@CurrentUser() user: AuthenticatedUser, @Body() dto: AdminPromotionGrantDto) {
+    return this.admin.grantPromotion(user.id, dto);
+  }
   @Get('subscriptions') subscriptions(@Query('status') status?: string) { return this.admin.subscriptions({ status }); }
   @Get('system-events') systemEvents(@Query('limit') limit?: string) { return this.admin.systemEventsList(Number(limit ?? 100)); }
   @Post('system-events/:id/resolve') resolveSystemEvent(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) { return this.admin.resolveSystemEvent(user.id, id); }

@@ -76,14 +76,15 @@ export function ListingGallery({ images, title }: { images?: ListingImage[]; tit
         aria-label={`Open image viewer for ${title}`}
       >
         <Image src={selectedImage.url} alt={selectedImage.alt ?? title} fill className="object-cover" priority sizes="(min-width: 1024px) 820px, 100vw" />
+        <span className="absolute bottom-3 right-3 rounded-full bg-black/70 px-3 py-1.5 text-xs font-bold text-white">{selected + 1} / {orderedImages.length} photos</span>
       </button>
       {orderedImages.length > 1 ? (
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+        <div className="flex snap-x gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-6 sm:overflow-visible sm:pb-0">
           {orderedImages.map((image, index) => (
             <button
               key={image.id}
               type="button"
-              className={`relative aspect-[4/3] overflow-hidden rounded-md border bg-stone-100 ${index === selected ? 'border-trust ring-2 ring-trust/30' : 'border-line'}`}
+              className={`relative aspect-[4/3] w-24 shrink-0 snap-start overflow-hidden rounded-md border bg-stone-100 sm:w-auto ${index === selected ? 'border-trust ring-2 ring-trust/30' : 'border-line'}`}
               onClick={() => setSelected(index)}
               aria-label={`Show image ${index + 1} of ${orderedImages.length}`}
             >

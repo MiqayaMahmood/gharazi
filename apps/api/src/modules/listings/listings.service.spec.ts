@@ -34,4 +34,40 @@ describe('ListingsService', () => {
       }),
     }));
   });
+
+  it('does not infer WhatsApp consent from the general contact phone', async () => {
+    const prisma = {
+      listing: {
+        findFirst: jest.fn().mockResolvedValue({
+          contactName: 'Seller',
+          contactPhone: '+92 300 1234567',
+          contactWhatsapp: null,
+        }),
+      },
+    };
+    const service = new ListingsService(prisma as never, {} as never);
+
+    await expect(service.getContact('listing-1')).resolves.toEqual({
+      contactName: 'Seller',
+      contactPhone: '+92 300 1234567',
+      whatsappUrl: undefined,
+    });
+  });
+
+  it('returns WhatsApp only for an explicitly stored, valid WhatsApp number', async () => {
+    const prisma = {
+      listing: {
+        findFirst: jest.fn().mockResolvedValue({
+          contactName: 'Seller',
+          contactPhone: '+92 300 1234567',
+          contactWhatsapp: '0300 7654321',
+        }),
+      },
+    };
+    const service = new ListingsService(prisma as never, {} as never);
+
+    await expect(service.getContact('listing-1')).resolves.toMatchObject({
+      whatsappUrl: 'https://wa.me/923007654321',
+    });
+  });
 });

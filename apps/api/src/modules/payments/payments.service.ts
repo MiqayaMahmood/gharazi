@@ -1,4 +1,5 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import Stripe from 'stripe';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -80,7 +81,88 @@ export class PaymentsService {
   getBySession(userId: string, sessionId: string) { return this.prisma.paymentTransaction.findFirst({ where: { userId, stripeCheckoutSessionId: sessionId } }); }
   async getMine(userId: string, id: string) { return this.prisma.paymentTransaction.findFirstOrThrow({ where: { id, userId }, include: { attempts: true } }); }
   listAdmin() { return this.prisma.paymentTransaction.findMany({ include: { attempts: true, user: { include: { profile: true } } }, orderBy: { createdAt: 'desc' }, take: 200 }); }
-  async reconcile(id: string) { const transaction = await this.prisma.paymentTransaction.findUniqueOrThrow({ where: { id } }); if (transaction.status === 'paid') await this.activateOneTime(transaction.id); return { ok: true, status: transaction.status }; }
+  async listReconciliationRequired(input: { limit?: number; cursor?: string } = {}) {
+    const limit = Math.min(Math.max(1, input.limit ?? 50), 100);
+    const rows = await this.prisma.paymentTransaction.findMany({
+      where: { status: 'paid', metadataJson: { path: ['fulfillmentReconciliation', 'status'], equals: 'required' } },
+      select: {
+        id: true, userId: true, entityType: true, entityId: true, packageCode: true,
+        provider: true, stripeCheckoutSessionId: true, stripePaymentIntentId: true,
+        status: true, paidAt: true, amount: true, currency: true, metadataJson: true, updatedAt: true,
+      },
+      ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit + 1,
+    });
+    const hasNextPage = rows.length > limit;
+    const page = rows.slice(0, limit);
+    const relatedPromotions = page.length
+      ? await this.prisma.promotion.findMany({
+          where: { paymentTransactionId: { in: page.map((row) => row.id) } },
+          select: { id: true, paymentTransactionId: true },
+        })
+      : [];
+    const promotionIdByPayment = new Map(relatedPromotions.map((promotion) => [promotion.paymentTransactionId, promotion.id]));
+    const items = page.map((row) => {
+      const metadata = this.jsonRecord(row.metadataJson);
+      const reconciliation = this.jsonRecord(metadata.fulfillmentReconciliation);
+      return {
+        id: row.id,
+        promotionId: promotionIdByPayment.get(row.id) ?? null,
+        userId: row.userId,
+        entityType: row.entityType,
+        entityId: row.entityId,
+        packageCode: row.packageCode,
+        status: row.status,
+        paidAt: row.paidAt,
+        amount: row.amount,
+        currency: row.currency,
+        updatedAt: row.updatedAt,
+        reconciliationStatus: reconciliation.status,
+        reconciliationReasonCode: reconciliation.reasonCode,
+        reconciliationRequiredAt: reconciliation.requiredAt,
+        reconciliationLastAttemptAt: reconciliation.lastAttemptAt,
+        stripePaymentVerified: row.provider === 'stripe' && Boolean(
+          row.paidAt && (row.stripeCheckoutSessionId || row.stripePaymentIntentId),
+        ),
+      };
+    });
+    return {
+      items,
+      nextCursor: hasNextPage ? page[page.length - 1]?.id ?? null : null,
+      hasNextPage,
+      limit,
+    };
+  }
+
+  async reconcile(id: string) {
+    const transaction = await this.prisma.paymentTransaction.findUnique({ where: { id } });
+    if (!transaction) throw new NotFoundException('Payment transaction was not found');
+    const isVerifiedStripePayment = transaction.provider === 'stripe' && transaction.status === 'paid' && Boolean(
+      transaction.paidAt && (transaction.stripeCheckoutSessionId || transaction.stripePaymentIntentId),
+    );
+    if (!isVerifiedStripePayment) throw new ForbiddenException('Only verified paid Stripe transactions can be reconciled');
+    const selected = transaction.packageCode ? findPackage(transaction.packageCode) : undefined;
+    if (!selected || selected.type !== 'one_time') throw new BadRequestException('This transaction has no one-time promotion fulfillment to reconcile');
+
+    const existing = await this.prisma.promotion.findUnique({ where: { paymentTransactionId: transaction.id } });
+    if (existing) {
+      await this.setFulfillmentReconciliation(transaction.id, 'resolved');
+      return { ok: true, status: transaction.status, outcome: 'already_fulfilled', promotionId: existing.id };
+    }
+
+    await this.setFulfillmentReconciliation(transaction.id, 'required', 'admin_retry_started');
+    try {
+      await this.activateOneTime(transaction.id);
+      const fulfilled = await this.prisma.promotion.findUnique({ where: { paymentTransactionId: transaction.id } });
+      if (!fulfilled) throw new ConflictException('Verified payment did not produce a promotion');
+      await this.setFulfillmentReconciliation(transaction.id, 'resolved');
+      return { ok: true, status: transaction.status, outcome: 'fulfilled', promotionId: fulfilled.id };
+    } catch (error) {
+      await this.setFulfillmentReconciliation(transaction.id, 'required', 'admin_retry_failed');
+      throw error;
+    }
+  }
 
   private async checkoutCompleted(session: Stripe.Checkout.Session) {
     const transaction = await this.findTransaction(session.id, session.metadata?.paymentTransactionId);
@@ -88,8 +170,8 @@ export class PaymentsService {
     const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
     const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
     const paid = session.mode === 'subscription' || session.payment_status === 'paid' || session.payment_status === 'no_payment_required';
-    await this.prisma.paymentTransaction.update({ where: { id: transaction.id }, data: { stripePaymentIntentId: paymentIntentId, stripeSubscriptionId: subscriptionId, status: paid ? 'paid' : 'pending', paidAt: paid ? transaction.paidAt ?? new Date() : undefined, metadataJson: session.metadata ?? undefined } });
-    if (paid && session.mode === 'payment') await this.activateOneTime(transaction.id);
+    await this.prisma.paymentTransaction.update({ where: { id: transaction.id }, data: { stripePaymentIntentId: paymentIntentId, stripeSubscriptionId: subscriptionId, status: paid ? 'paid' : 'pending', paidAt: paid ? transaction.paidAt ?? new Date() : undefined, metadataJson: this.mergeJsonMetadata(transaction.metadataJson, session.metadata) } });
+    if (paid && session.mode === 'payment') await this.fulfillVerifiedPromotion(transaction.id);
     if (subscriptionId) await this.retrieveAndSyncSubscription(subscriptionId);
     return { received: true };
   }
@@ -107,7 +189,7 @@ export class PaymentsService {
     if (!transaction) return { received: true };
     if (status === 'failed' && transaction.status === 'paid') return { received: true };
     await this.prisma.paymentTransaction.update({ where: { id: transaction.id }, data: { stripePaymentIntentId: intent.id, status, paidAt: status === 'paid' ? transaction.paidAt ?? new Date() : undefined } });
-    if (status === 'paid' && transaction.packageCode && findPackage(transaction.packageCode)?.type === 'one_time') await this.activateOneTime(transaction.id);
+    if (status === 'paid' && transaction.packageCode && findPackage(transaction.packageCode)?.type === 'one_time') await this.fulfillVerifiedPromotion(transaction.id);
     this.logger[status === 'failed' ? 'warn' : 'log']({ action: `stripe.payment.${status}`, transactionId: transaction.id, paymentIntentId: intent.id, userId: transaction.userId });
     if (status === 'failed') void this.systemEvents.record({ severity: 'warn', source: 'stripe', message: 'Stripe payment failed', userId: transaction.userId, entityType: transaction.entityType, entityId: transaction.entityId ?? undefined, detailsJson: { transactionId: transaction.id, paymentIntentId: intent.id } });
     return { received: true };
@@ -118,16 +200,90 @@ export class PaymentsService {
     if (!transaction.packageCode || transaction.status !== 'paid') return;
     const selected = findPackage(transaction.packageCode);
     if (!selected || selected.type !== 'one_time') return;
+    if (transaction.entityType !== selected.requiresEntityType) {
+      throw new ForbiddenException('Payment package target does not match its entitlement');
+    }
     const now = new Date(); const endsAt = new Date(now.getTime() + (selected.durationDays ?? 30) * 86400000);
     await this.prisma.$transaction(async (tx) => {
       const existing = await tx.promotion.findUnique({ where: { paymentTransactionId: transaction.id } });
       if (existing) { this.logger.log({ action: 'stripe.webhook.duplicate_ignored', transactionId: transaction.id, promotionId: existing.id }); return; }
+      if (transaction.entityType === 'listing' && transaction.entityId) {
+        const eligible = await tx.listing.findFirst({ where: {
+          id: transaction.entityId,
+          status: 'active',
+          publishedAt: { not: null },
+          deletedAt: null,
+          OR: [{ ownerUserId: transaction.userId }, { managedByUserId: transaction.userId }],
+        }, select: { id: true } });
+        if (!eligible) throw new ForbiddenException('Paid listing promotion target is no longer eligible');
+      } else if (transaction.entityType === 'project' && transaction.entityId) {
+        const eligible = await tx.project.findFirst({ where: {
+          id: transaction.entityId,
+          status: 'active',
+          publishedAt: { not: null },
+          deletedAt: null,
+          developer: { ownerUserId: transaction.userId },
+        }, select: { id: true } });
+        if (!eligible) throw new ForbiddenException('Paid project promotion target is no longer eligible');
+      }
       const targetId = transaction.entityId ?? transaction.id;
       await tx.promotion.create({ data: { entityType: transaction.entityType, entityId: targetId, promotionType: selected.code, packageCode: selected.code, placementCode: selected.requiresEntityType === 'banner' ? selected.code : null, startsAt: now, endsAt, status: 'active', purchasedByUserId: transaction.userId, paymentTransactionId: transaction.id, isHot: selected.entitlements.includes('listing_hot'), isFeatured: selected.entitlements.some((x) => x.includes('featured')) } });
       if (transaction.entityType === 'listing' && transaction.entityId) await tx.listing.update({ where: { id: transaction.entityId }, data: { isHot: selected.entitlements.includes('listing_hot') || undefined, isFeatured: selected.entitlements.includes('listing_featured') || undefined, lastRefreshedAt: selected.entitlements.includes('listing_refresh') ? now : undefined } });
       if (transaction.entityType === 'project' && transaction.entityId && selected.entitlements.includes('project_featured')) await tx.project.update({ where: { id: transaction.entityId }, data: { isFeatured: true } });
     });
     this.logger.log({ action: 'promotion.activated', transactionId: transaction.id, packageCode: selected.code, entityType: transaction.entityType, entityId: transaction.entityId, userId: transaction.userId });
+  }
+
+  private async fulfillVerifiedPromotion(transactionId: string) {
+    try {
+      await this.activateOneTime(transactionId);
+    } catch (error) {
+      const reasonCode = error instanceof ForbiddenException ? 'target_ineligible_or_mismatched' : 'promotion_fulfillment_failed';
+      try {
+        await this.setFulfillmentReconciliation(transactionId, 'required', reasonCode);
+      } catch (markerError) {
+        this.logger.error({ action: 'payment.reconciliation.marker_failed', transactionId, error: markerError instanceof Error ? markerError.name : 'unknown' });
+      }
+      try {
+        await this.audit.record({
+          action: 'payment.fulfillment.reconciliation_required',
+          entityType: 'payment_transaction',
+          entityId: transactionId,
+          metadataJson: { outcome: 'reconciliation_required', reasonCode },
+        });
+      } catch (auditError) {
+        this.logger.error({ action: 'payment.reconciliation.audit_failed', transactionId, error: auditError instanceof Error ? auditError.name : 'unknown' });
+      }
+      throw error;
+    }
+    await this.setFulfillmentReconciliation(transactionId, 'resolved');
+  }
+
+  private async setFulfillmentReconciliation(transactionId: string, status: 'required' | 'resolved', reasonCode?: string) {
+    const transaction = await this.prisma.paymentTransaction.findUnique({ where: { id: transactionId }, select: { metadataJson: true } });
+    if (!transaction) return;
+    const metadata = this.jsonRecord(transaction.metadataJson);
+    const previous = this.jsonRecord(metadata.fulfillmentReconciliation);
+    if (status === 'resolved' && previous.status !== 'required') return;
+    const now = new Date().toISOString();
+    const reconciliation = status === 'required'
+      ? { ...previous, status, reasonCode, requiredAt: previous.requiredAt ?? now, lastAttemptAt: now }
+      : { ...previous, status, resolvedAt: now };
+    await this.prisma.paymentTransaction.update({
+      where: { id: transactionId },
+      data: { metadataJson: { ...metadata, fulfillmentReconciliation: reconciliation } as Prisma.InputJsonValue },
+    });
+  }
+
+  private mergeJsonMetadata(existing: unknown, stripeMetadata?: Stripe.Metadata | null) {
+    const metadata = this.jsonRecord(existing);
+    return stripeMetadata ? { ...metadata, ...stripeMetadata } as Prisma.InputJsonValue : (Object.keys(metadata).length ? metadata as Prisma.InputJsonValue : undefined);
+  }
+
+  private jsonRecord(value: unknown): Record<string, any> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+      ? value as Record<string, any>
+      : {};
   }
 
   private async retrieveAndSyncSubscription(id: string) { return this.syncSubscription(await this.requireStripe().subscriptions.retrieve(id)); }
@@ -163,8 +319,14 @@ export class PaymentsService {
     if (entityType && entityType !== selected.requiresEntityType) throw new BadRequestException(`Package requires entityType=${selected.requiresEntityType}`);
     if (selected.requiresEntityType === 'listing') {
       if (!entityId) throw new BadRequestException('entityId is required');
-      const owned = await this.prisma.listing.findFirst({ where: { id: entityId, OR: [{ ownerUserId: userId }, { managedByUserId: userId }] } });
-      if (!owned) throw new ForbiddenException('You do not own or manage this listing');
+      const eligible = await this.prisma.listing.findFirst({ where: {
+        id: entityId,
+        status: 'active',
+        publishedAt: { not: null },
+        deletedAt: null,
+        OR: [{ ownerUserId: userId }, { managedByUserId: userId }],
+      } });
+      if (!eligible) throw new ForbiddenException('You do not manage an eligible published listing');
       return entityId;
     }
     if (selected.requiresEntityType === 'project' || selected.requiresEntityType === 'developer') {
@@ -172,8 +334,8 @@ export class PaymentsService {
       if (!developer) throw new ForbiddenException('A developer profile is required');
       if (selected.requiresEntityType === 'project') {
         if (!entityId) throw new BadRequestException('entityId is required');
-        const project = await this.prisma.project.findFirst({ where: { id: entityId, developerId: developer.id } });
-        if (!project) throw new ForbiddenException('You do not manage this project');
+        const project = await this.prisma.project.findFirst({ where: { id: entityId, developerId: developer.id, status: 'active', publishedAt: { not: null }, deletedAt: null } });
+        if (!project) throw new ForbiddenException('You do not manage an eligible published project');
         return entityId;
       }
       return developer.id;

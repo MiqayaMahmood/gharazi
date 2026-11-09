@@ -54,6 +54,9 @@ export type Inquiry = {
   firstMessage?: string;
   status?: string;
   createdAt?: string;
+  listing?: Pick<Listing, 'id' | 'publicId' | 'title'> | null;
+  project?: Pick<Project, 'id' | 'slug' | 'name'> | null;
+  chat?: { id: string } | null;
 };
 
 export type ChatThread = {

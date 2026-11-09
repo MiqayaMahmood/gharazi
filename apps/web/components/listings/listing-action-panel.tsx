@@ -40,7 +40,7 @@ export function ListingActionPanel({ listing }: { listing: Listing }) {
           <Button type="button" variant="secondary">Report listing</Button>
         </div>
       </Card>
-      <InquiryPanel subject={listing.title} listingId={listing.id} listerName={listing.listerName} listerRole={listing.listerRole} />
+      <InquiryPanel subject={listing.title} listingId={listing.id} publicId={listing.publicId} listerName={listing.listerName} listerRole={listing.listerRole} />
     </div>
   );
 }

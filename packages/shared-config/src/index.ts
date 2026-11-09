@@ -20,6 +20,7 @@ const envSchema = z.object({
   ELASTICSEARCH_INDEX_PREFIX: z.string().default('Gharazi'),
   SEARCH_ENABLED: envBoolean.default(true),
   SEARCH_DB_FALLBACK_ENABLED: envBoolean.default(true),
+  PROMOTION_ACTIVATION_ENABLED: envBoolean.default(false),
   OTEL_ENABLED: envBoolean.default(false),
   OTEL_SERVICE_NAME: z.string().default('Gharazi-api'),
   OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl,

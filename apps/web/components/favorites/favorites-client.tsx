@@ -37,7 +37,7 @@ export function FavoritesClient() {
 
   return (
     <div className="grid gap-5">
-      <Tabs tabs={tabs.map((item) => item.value)} value={tab} onChange={setTab} />
+      <div className="max-w-full overflow-x-auto pb-1"><Tabs tabs={tabs.map((item) => item.value)} value={tab} onChange={setTab} /></div>
       {selected.length === 0 ? <EmptyState title={`No saved ${tabs.find((item) => item.value === tab)?.label.toLowerCase()} yet`} message="Save useful items to build your shortlist. Agent/agency and tool bookmarks need stable backend entities before they can be saved." /> : null}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {selected.map((favorite) => {

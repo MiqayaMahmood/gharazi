@@ -17,6 +17,7 @@ import {
   listAdminCmsPages,
   listAdminListings,
   listAdminPayments,
+  listAdminPaymentReconciliationRequired,
   listAdminProjects,
   listAdminProfessionals,
   listAdminPromotions,
@@ -190,8 +191,8 @@ export function useAdminUsers() {
   return useQuery({ queryKey: ['admin-users'], queryFn: listAdminUsers, retry: false });
 }
 
-export function useAdminListings(status?: string) {
-  return useQuery({ queryKey: ['admin-listings', status], queryFn: () => listAdminListings(status), retry: false });
+export function useAdminListings(status?: string, enabled = true) {
+  return useQuery({ queryKey: ['admin-listings', status], queryFn: () => listAdminListings(status), retry: false, enabled });
 }
 
 export function useAdminProjects(status?: string) {
@@ -222,6 +223,15 @@ export function useAdminSubscriptions() {
 
 export function useAdminPayments() {
   return useQuery({ queryKey: ['admin-payments'], queryFn: listAdminPayments, retry: false });
+}
+
+export function useAdminPaymentReconciliationRequired(cursor?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['admin-payment-reconciliation-required', cursor],
+    queryFn: () => listAdminPaymentReconciliationRequired({ cursor, limit: 100 }),
+    retry: false,
+    enabled,
+  });
 }
 
 export function useAdminAnalyticsSummary(range = 'current_month') {

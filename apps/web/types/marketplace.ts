@@ -52,6 +52,7 @@ export type Listing = {
   images?: ListingImage[];
   media?: ListingImage[];
   verificationStatus?: string;
+  status?: string;
   isFeatured?: boolean;
   isHot?: boolean;
   updatedAt?: string;

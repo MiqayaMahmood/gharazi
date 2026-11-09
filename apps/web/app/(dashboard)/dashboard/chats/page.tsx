@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function ChatsPage() {
   return (
     <div>
-      <h1 className="text-3xl font-black">Chats</h1>
+      <h1 className="text-2xl font-black sm:text-3xl">Chats</h1>
       <p className="mt-2 text-muted">Text-first conversations connected to listings and projects.</p>
       <div className="mt-6"><Suspense><ChatInboxClient /></Suspense></div>
     </div>

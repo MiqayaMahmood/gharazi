@@ -476,6 +476,7 @@ model Notification {
   createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   deliveries       NotificationDelivery[]
   user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activationEvents PromotionActivationOutbox[]
 
   @@index([userId, readAt, createdAt])
   @@map("notifications")
@@ -705,11 +706,57 @@ model Promotion {
   createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   purchasedByUser      User     @relation("PromotionPurchaser", fields: [purchasedByUserId], references: [id])
+  activationEvent      PromotionActivationOutbox?
 
   @@index([entityType, entityId, status])
   @@index([purchasedByUserId, status])
   @@index([startsAt, endsAt, status])
   @@map("promotions")
+}
+
+model PromotionActivationOutbox {
+  id                       String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  promotionId              String     @unique @map("promotion_id") @db.Uuid
+  eventKey                 String     @unique @map("event_key") @db.VarChar(128)
+  notificationId           String?    @unique @map("notification_id") @db.Uuid
+  notificationCreatedAt    DateTime?  @map("notification_created_at") @db.Timestamptz(6)
+  notificationEnqueuedAt   DateTime?  @map("notification_enqueued_at") @db.Timestamptz(6)
+  notificationStatus       String?    @map("notification_status") @db.VarChar(24)
+  notificationAttemptCount Int        @default(0) @map("notification_attempt_count")
+  notificationGeneration   Int        @default(0) @map("notification_generation")
+  notificationClaimToken   String?    @map("notification_claim_token") @db.Uuid
+  notificationClaimedAt     DateTime?  @map("notification_claimed_at") @db.Timestamptz(6)
+  notificationNextAttemptAt DateTime? @map("notification_next_attempt_at") @db.Timestamptz(6)
+  notificationCompletedAt  DateTime?  @map("notification_completed_at") @db.Timestamptz(6)
+  notificationLastError    String?    @map("notification_last_error") @db.VarChar(1000)
+  searchIndexHandledAt     DateTime?  @map("search_index_handled_at") @db.Timestamptz(6)
+  searchIndexEnqueuedAt    DateTime?  @map("search_index_enqueued_at") @db.Timestamptz(6)
+  searchIndexStatus        String?    @map("search_index_status") @db.VarChar(24)
+  searchIndexAttemptCount  Int        @default(0) @map("search_index_attempt_count")
+  searchIndexGeneration    Int        @default(0) @map("search_index_generation")
+  searchIndexClaimToken    String?    @map("search_index_claim_token") @db.Uuid
+  searchIndexClaimedAt     DateTime?  @map("search_index_claimed_at") @db.Timestamptz(6)
+  searchIndexNextAttemptAt DateTime?  @map("search_index_next_attempt_at") @db.Timestamptz(6)
+  searchIndexCompletedAt   DateTime?  @map("search_index_completed_at") @db.Timestamptz(6)
+  searchIndexLastError     String?    @map("search_index_last_error") @db.VarChar(1000)
+  attemptCount             Int        @default(0) @map("attempt_count")
+  claimedAt                DateTime?  @map("claimed_at") @db.Timestamptz(6)
+  completedAt              DateTime?  @map("completed_at") @db.Timestamptz(6)
+  lastError                String?    @map("last_error") @db.VarChar(1000)
+  createdAt                DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  promotion                Promotion  @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  notification             Notification? @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+
+  @@index([completedAt, createdAt])
+  @@index([claimedAt])
+  @@index([notificationStatus, notificationNextAttemptAt], map: "promo_act_outbox_notif_next_idx")
+  @@index([notificationStatus, notificationClaimedAt], map: "promo_act_outbox_notif_claim_idx")
+  @@index([notificationStatus, notificationEnqueuedAt], map: "promo_act_outbox_notif_queue_idx")
+  @@index([searchIndexStatus, searchIndexNextAttemptAt], map: "promo_act_outbox_search_next_idx")
+  @@index([searchIndexStatus, searchIndexClaimedAt], map: "promo_act_outbox_search_claim_idx")
+  @@index([searchIndexStatus, searchIndexEnqueuedAt], map: "promo_act_outbox_search_queue_idx")
+  @@map("promotion_activation_outbox")
 }
 
 model CmsPage {

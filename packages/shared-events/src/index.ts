@@ -12,6 +12,8 @@ export const QUEUES = {
 export type NotificationJobPayload = {
   userId: string;
   notificationId?: string;
+  eventId?: string;
+  effectGeneration?: number;
   channel?: 'in_app' | 'email' | 'sms' | 'push';
   template: string;
   data?: Record<string, unknown>;
@@ -21,6 +23,8 @@ export type SearchIndexingJobPayload = {
   type: 'index-listing' | 'delete-listing' | 'index-project' | 'delete-project';
   entityId: string;
   publicId?: string;
+  eventId?: string;
+  effectGeneration?: number;
 };
 
 export type SavedSearchAlertJobPayload = {

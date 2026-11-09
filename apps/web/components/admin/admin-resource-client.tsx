@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
@@ -11,6 +11,7 @@ import {
   assignAdminSubmission,
   bootstrapAdminSearch,
   createAdminUser,
+  grantAdminPromotion,
   reconcileAdminPayment,
   repairAdminDataIntegrity,
   reviewAdminListing,
@@ -30,6 +31,7 @@ import {
   useAdminDataIntegrity,
   useAdminListings,
   useAdminPayments,
+  useAdminPaymentReconciliationRequired,
   useAdminProjects,
   useAdminProfessionals,
   useAdminPromotions,
@@ -41,7 +43,10 @@ import {
   useAdminSystemEvents,
   useAdminUsers,
   useAdminVerificationRequests,
+  useCurrentUser,
 } from '@/lib/query/hooks';
+import { isAdmin } from '@/lib/auth/roles';
+import type { AdminPromotionGrantInput } from '@/lib/api/admin';
 import { AdminError, AdminLoading, AdminPageHeader, AdminTable, StatusBadge, formatDate, readPath } from './admin-primitives';
 
 type Resource =
@@ -91,6 +96,27 @@ function text(value: unknown): string {
   if (value === null || value === undefined || value === '') return '-';
   if (typeof value === 'object') return JSON.stringify(value).slice(0, 160);
   return String(value);
+}
+
+function isVerifiedPaidStripePayment(row: Record<string, unknown>) {
+  return row.status === 'paid' && row.provider === 'stripe' && Boolean(
+    row.paidAt && (row.stripeCheckoutSessionId || row.stripePaymentIntentId),
+  );
+}
+
+function safeAuditDetails(row: Record<string, unknown>) {
+  const metadata = row.metadataJson && typeof row.metadataJson === 'object'
+    ? row.metadataJson as Record<string, unknown>
+    : {};
+  const outcome = metadata.outcome;
+  const reason = metadata.reason;
+  const reasonCode = metadata.reasonCode;
+  return [
+    outcome ? `Outcome: ${text(outcome)}` : null,
+    reasonCode ? `Reason code: ${text(reasonCode)}` : null,
+    reason ? `Reason: ${text(reason)}` : null,
+    metadata.promotionType ? `Promotion: ${text(metadata.promotionType)} (${text(metadata.durationDays)} days)` : null,
+  ].filter(Boolean).join(' · ') || '-';
 }
 
 function useResource(resource: Resource, professionalStatus?: string): QueryResult {
@@ -200,6 +226,14 @@ function columnsFor(resource: Resource) {
     { key: 'stripeCheckoutSessionId', label: 'Stripe reference', render: (row: Record<string, unknown>) => text(row.stripePaymentIntentId ?? row.stripeSubscriptionId ?? row.stripeCheckoutSessionId) },
     { key: 'paidAt', label: 'Paid / created', render: (row: Record<string, unknown>) => formatDate(row.paidAt ?? row.createdAt) },
   ];
+  if (resource === 'audit') return [
+    { key: 'action', label: 'Action' },
+    { key: 'actorUser.profile.fullName', label: 'Administrator', render: (row: Record<string, unknown>) => text(readPath(row, 'actorUser.profile.fullName') ?? row.actorUserId) },
+    { key: 'entityType', label: 'Target type' },
+    { key: 'entityId', label: 'Target ID', render: (row: Record<string, unknown>) => text(row.entityId) },
+    { key: 'metadataJson', label: 'Outcome / details', render: safeAuditDetails },
+    { key: 'createdAt', label: 'Timestamp', render: (row: Record<string, unknown>) => formatDate(row.createdAt) },
+  ];
   if (resource === 'promotions') return [
     { key: 'packageCode', label: 'Package', render: (row: Record<string, unknown>) => text(row.packageCode ?? row.promotionType) },
     { key: 'entityType', label: 'Entity', render: (row: Record<string, unknown>) => `${text(row.entityType)} ${text(row.entityId).slice(0, 8)}` },
@@ -262,6 +296,59 @@ export function AdminResourceClient({ resource }: { resource: Resource }) {
   const [professionalStatus, setProfessionalStatus] = useState('');
   const query = useResource(resource, professionalStatus);
   const mutation = useActions(resource);
+  const queryClient = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
+  const canGrantPromotions = isAdmin(currentUser);
+  const listingSuggestions = useAdminListings('active', resource === 'promotions' && canGrantPromotions);
+  const [reconciliationView, setReconciliationView] = useState(false);
+  const [reconciliationCursor, setReconciliationCursor] = useState<string | undefined>();
+  const [reconciliationPrevious, setReconciliationPrevious] = useState<Array<string | undefined>>([]);
+  const reconciliationPage = useAdminPaymentReconciliationRequired(reconciliationCursor, resource === 'payments' && reconciliationView);
+  const [listingId, setListingId] = useState('');
+  const [promotionType, setPromotionType] = useState<AdminPromotionGrantInput['promotionType']>('listing_hot');
+  const [grantReason, setGrantReason] = useState('');
+  const [grantAttempt, setGrantAttempt] = useState<{ fingerprint: string; input: AdminPromotionGrantInput } | null>(null);
+  const [grantMessage, setGrantMessage] = useState('');
+  const [reconciliationMessage, setReconciliationMessage] = useState('');
+  const grantMutation = useMutation({
+    mutationFn: grantAdminPromotion,
+    onSuccess: async (result) => {
+      const replayed = result.replayed === true;
+      setGrantMessage(replayed ? 'This request was already completed. The existing grant was returned.' : 'Promotion grant created and recorded in the audit log.');
+      setGrantAttempt(null);
+      setListingId('');
+      setGrantReason('');
+      await queryClient.invalidateQueries({ queryKey: ['admin-promotions'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-audit-logs'] });
+    },
+  });
+  const reconciliationMutation = useMutation({
+    mutationFn: reconcileAdminPayment,
+    onSuccess: async (result) => {
+      setReconciliationMessage(`Payment ${String(result.outcome ?? 'reconciliation completed')}.`);
+      await queryClient.invalidateQueries({ queryKey: ['admin-payments'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-payment-reconciliation-required'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-audit-logs'] });
+    },
+  });
+  const submitGrant = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const reason = grantReason.trim();
+    if (reason.length < 10) return;
+    const durationDays: AdminPromotionGrantInput['durationDays'] = promotionType === 'listing_hot' ? 14 : 30;
+    const fingerprint = JSON.stringify({ listingId: listingId.trim(), promotionType, durationDays, reason });
+    if (!window.confirm(`Grant ${promotionType === 'listing_hot' ? 'Hot Listing (14 days)' : 'Super Hot Listing (30 days)'} to listing ${listingId.trim()}? This creates an active administrative promotion and an audit record.`)) return;
+    const input = grantAttempt?.fingerprint === fingerprint
+      ? grantAttempt.input
+      : { idempotencyKey: crypto.randomUUID(), listingId: listingId.trim(), promotionType, durationDays, reason };
+    setGrantAttempt({ fingerprint, input });
+    setGrantMessage('');
+    grantMutation.mutate(input);
+  };
+  const retryGrant = () => {
+    if (!grantAttempt || !window.confirm('Retry the same grant request using its original idempotency key?')) return;
+    grantMutation.mutate(grantAttempt.input);
+  };
   const [adminForm, setAdminForm] = useState({ fullName: '', email: '', phoneNumber: '', password: '' });
   const createAdmin = useMutation({
     mutationFn: createAdminUser,
@@ -272,6 +359,10 @@ export function AdminResourceClient({ resource }: { resource: Resource }) {
   });
   const [title, description] = titles[resource];
   const rows = useMemo(() => query.data ?? [], [query.data]);
+  const suggestedListings = (listingSuggestions.data ?? []).filter((row) => row.status === 'active' && Boolean(row.publishedAt) && !row.deletedAt);
+  const displayedRows = resource === 'payments' && reconciliationView
+    ? reconciliationPage.data?.items ?? []
+    : rows;
 
   if (query.isLoading) return <AdminLoading />;
   if (query.isError) return <AdminError message="The backend endpoint for this admin view may be unavailable or your role may not have access." />;
@@ -290,6 +381,95 @@ export function AdminResourceClient({ resource }: { resource: Resource }) {
   return (
     <>
       <AdminPageHeader title={title} description={description} />
+      {resource === 'promotions' && canGrantPromotions ? (
+        <Card className="mb-5 p-4 sm:p-5">
+          <h3 className="text-lg font-bold text-ink">Grant a promotion</h3>
+          <p className="mt-1 text-sm text-muted">Administrative grants are free of Stripe payment evidence. The API verifies current listing eligibility and records the administrator and reason.</p>
+          <form className="mt-4 grid gap-4 md:grid-cols-2" onSubmit={submitGrant}>
+            <label className="grid gap-1 text-sm font-semibold text-ink">
+              Listing ID
+              <Input list="admin-grant-listings" value={listingId} onChange={(event) => { setListingId(event.target.value); setGrantMessage(''); }} placeholder="Paste or select a listing UUID" required />
+              <span className="text-xs font-normal text-muted">Suggestions show up to 200 active published listings. The backend remains authoritative for eligibility.</span>
+              <datalist id="admin-grant-listings">
+                {suggestedListings.map((listing) => <option key={String(listing.id)} value={String(listing.id)}>{String(listing.title ?? 'Listing')} · {String(listing.publicId ?? '')}</option>)}
+              </datalist>
+            </label>
+            <label className="grid gap-1 text-sm font-semibold text-ink">
+              Promotion package
+              <select className="min-h-11 rounded-md border border-line bg-white px-3 py-2 text-sm" value={promotionType} onChange={(event) => setPromotionType(event.target.value as AdminPromotionGrantInput['promotionType'])}>
+                <option value="listing_hot">Hot Listing · 14 days</option>
+                <option value="listing_super_hot">Super Hot Listing · 30 days</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm font-semibold text-ink md:col-span-2">
+              Administrative reason
+              <textarea className="min-h-24 rounded-md border border-line bg-white px-3 py-2 text-sm font-normal" value={grantReason} onChange={(event) => { setGrantReason(event.target.value); setGrantMessage(''); }} minLength={10} maxLength={1000} required aria-describedby="admin-grant-reason-help" />
+              <span id="admin-grant-reason-help" className="text-xs font-normal text-muted">Required, 10–1000 characters. This reason is retained in the grant audit record.</span>
+            </label>
+            {grantMutation.isError ? <div className="md:col-span-2"><ErrorAlert error={grantMutation.error} /></div> : null}
+            {grantMessage ? <p className="md:col-span-2 text-sm font-semibold text-trust" role="status">{grantMessage}</p> : null}
+            <div className="flex flex-wrap gap-2 md:col-span-2">
+              <Button type="submit" disabled={grantMutation.isPending || grantReason.trim().length < 10 || !listingId.trim()}>
+                {grantMutation.isPending ? 'Submitting…' : 'Review and grant'}
+              </Button>
+              {grantMutation.isError && grantAttempt ? <Button type="button" variant="secondary" disabled={grantMutation.isPending} onClick={retryGrant}>Retry same request</Button> : null}
+            </div>
+          </form>
+        </Card>
+      ) : null}
+      {resource === 'payments' ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <Button type="button" variant={!reconciliationView ? 'primary' : 'secondary'} onClick={() => setReconciliationView(false)}>All payments</Button>
+          <Button type="button" variant={reconciliationView ? 'primary' : 'secondary'} onClick={() => { setReconciliationView(true); setReconciliationCursor(undefined); setReconciliationPrevious([]); setReconciliationMessage(''); }}>Reconciliation required</Button>
+          {reconciliationMessage ? <span className="text-sm font-semibold text-trust" role="status">{reconciliationMessage}</span> : null}
+        </div>
+      ) : null}
+      {resource === 'payments' && reconciliationView ? (
+        <>
+          <Card className="mb-4 p-4 text-sm text-muted">This view paginates all paid transactions marked for fulfillment reconciliation. Only verified Stripe payments are actionable. Reconciliation never issues an automatic refund.</Card>
+          {reconciliationPage.isLoading ? <AdminLoading /> : null}
+          {reconciliationPage.isError ? <AdminError message="Unable to load reconciliation-required payments." /> : null}
+          {reconciliationMutation.isError ? <div className="mb-4"><ErrorAlert error={reconciliationMutation.error} /></div> : null}
+          {!reconciliationPage.isLoading && !reconciliationPage.isError ? (
+            <>
+              <AdminTable
+                columns={[
+                  { key: 'id', label: 'Payment ID' },
+                  { key: 'entityType', label: 'Target', render: (row) => `${text(row.entityType)} · ${text(row.entityId)}` },
+                  { key: 'packageCode', label: 'Package' },
+                  { key: 'status', label: 'Payment status', render: (row) => <StatusBadge value={row.status} /> },
+                  { key: 'amount', label: 'Paid amount', render: (row) => `${text(row.currency)} ${text(row.amount)}` },
+                  { key: 'paidAt', label: 'Paid at', render: (row) => formatDate(row.paidAt) },
+                  { key: 'reconciliationReasonCode', label: 'Failure / reason', render: (row) => text(row.reconciliationReasonCode) },
+                  { key: 'stripePaymentVerified', label: 'Payment verification', render: (row) => row.stripePaymentVerified === true ? 'Verified Stripe payment' : 'Verification reference unavailable' },
+                ]}
+                rows={displayedRows}
+                actions={(row) => row.status === 'paid' && row.reconciliationStatus === 'required' && row.stripePaymentVerified === true
+                  ? <Button type="button" variant="secondary" disabled={reconciliationMutation.isPending} onClick={() => {
+                    if (window.confirm(`Retry fulfillment for verified payment ${String(row.id)}? This does not charge or refund the customer.`)) reconciliationMutation.mutate(String(row.id));
+                  }}>Reconcile</Button>
+                  : <span className="text-xs text-muted">Not eligible for retry</span>}
+              />
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <Button type="button" variant="secondary" disabled={!reconciliationPrevious.length || reconciliationMutation.isPending} onClick={() => {
+                  const previous = [...reconciliationPrevious];
+                  const cursor = previous.pop();
+                  setReconciliationPrevious(previous);
+                  setReconciliationCursor(cursor);
+                }}>Previous page</Button>
+                <Button type="button" variant="secondary" disabled={!reconciliationPage.data?.hasNextPage || reconciliationMutation.isPending} onClick={() => {
+                  const next = reconciliationPage.data?.nextCursor;
+                  if (next) {
+                    setReconciliationPrevious((previous) => [...previous, reconciliationCursor]);
+                    setReconciliationCursor(next);
+                  }
+                }}>Next page</Button>
+                <span className="text-sm text-muted">Page size {reconciliationPage.data?.limit ?? 100}; {reconciliationPage.data?.hasNextPage ? 'more results available' : 'end of matching results'}.</span>
+              </div>
+            </>
+          ) : null}
+        </>
+      ) : null}
       {resource === 'users' ? (
         <Card className="mb-5 grid gap-3 p-4 lg:grid-cols-5">
           <Input placeholder="Full name" value={adminForm.fullName} onChange={(event) => setAdminForm({ ...adminForm, fullName: event.target.value })} />
@@ -311,7 +491,7 @@ export function AdminResourceClient({ resource }: { resource: Resource }) {
           {(['listings', 'projects', 'areas'] as const).map((action) => <Button key={action} variant="secondary" onClick={() => mutation.mutate({ row: rows[0] ?? {}, action })}>Reindex {action}</Button>)}
         </div>
       ) : null}
-      <AdminTable
+      {!(resource === 'payments' && reconciliationView) ? <AdminTable
         columns={columnsFor(resource)}
         rows={rows}
         actions={(row) => {
@@ -320,11 +500,13 @@ export function AdminResourceClient({ resource }: { resource: Resource }) {
           if (resource === 'listings' || resource === 'projects' || resource === 'verification') return <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => mutation.mutate({ row, action: 'approve' })}>Approve</Button><Button variant="ghost" onClick={() => mutation.mutate({ row, action: 'reject' })}>Reject</Button></div>;
           if (resource === 'reports') return <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => mutation.mutate({ row, action: 'resolve' })}>Resolve</Button><Button variant="ghost" onClick={() => mutation.mutate({ row, action: 'dismiss' })}>Dismiss</Button></div>;
           if (resource === 'submissions') return <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => mutation.mutate({ row, action: 'in_progress' })}>In progress</Button><Button variant="ghost" onClick={() => mutation.mutate({ row, action: 'resolved' })}>Resolve</Button></div>;
-          if (resource === 'payments') return <Button variant="secondary" onClick={() => mutation.mutate({ row, action: 'reconcile' })}>Reconcile</Button>;
+          if (resource === 'payments' && isVerifiedPaidStripePayment(row)) return <Button type="button" variant="secondary" disabled={mutation.isPending} onClick={() => {
+            if (window.confirm(`Attempt fulfillment reconciliation for verified paid Stripe transaction ${String(row.id)}? This does not charge or refund the customer.`)) mutation.mutate({ row, action: 'reconcile' });
+          }}>Reconcile</Button>;
           if (resource === 'system-events' && row.status === 'open') return <Button variant="secondary" onClick={() => mutation.mutate({ row, action: 'resolve' })}>Resolve</Button>;
           return null;
         }}
-      />
+      /> : null}
     </>
   );
 }

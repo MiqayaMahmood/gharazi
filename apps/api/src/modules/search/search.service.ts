@@ -19,7 +19,7 @@ export class SearchService {
   async searchListings(query: SearchListingsQueryDto) {
     if (!this.searchEnabled()) return this.searchListingsWithDbFallback(query, 'Search is disabled; using PostgreSQL fallback.');
     try {
-      const filters = this.listingFilters(query);
+      const filters = await this.listingFilters(query);
       
       const sort = this.sort(query.sort, { price: 'priceAmount', area: 'areaValue' });
       const response = await this.elasticsearch.search('listings', {
@@ -138,7 +138,7 @@ export class SearchService {
     };
   }
 
-  private listingFilters(query: SearchListingsQueryDto) {
+  private async listingFilters(query: SearchListingsQueryDto) {
     const filter: unknown[] = [{ term: { status: 'active' } }];
     this.term(filter, 'cityId', query.cityId);
     this.term(filter, 'citySlug', query.citySlug);
@@ -147,7 +147,7 @@ export class SearchService {
     this.term(filter, 'purposeId', query.purposeId);
     this.term(filter, 'purposeSlug', this.listingPurposeSlug(query));
     this.term(filter, 'propertyTypeId', query.propertyTypeId);
-    this.term(filter, 'propertyTypeCode', query.propertyTypeCode);
+    await this.listingPropertyTypeFilter(filter, query.propertyTypeCode);
     this.term(filter, 'bedrooms', query.bedrooms);
     this.term(filter, 'bathrooms', query.bathrooms);
     this.term(filter, 'furnishedStatus', query.furnishedStatus);
@@ -157,6 +157,23 @@ export class SearchService {
     this.geo(filter, query);
     
     return filter;
+  }
+
+  private async listingPropertyTypeFilter(filter: unknown[], propertyTypeCode?: string) {
+    if (!propertyTypeCode) return;
+    const classification = this.listingPropertyTypeWhere(propertyTypeCode);
+    const propertyTypes = await this.prisma.propertyType.findMany({ where: classification, select: { id: true } });
+    filter.push(propertyTypes.length
+      ? { terms: { propertyTypeId: propertyTypes.map((propertyType) => propertyType.id) } }
+      : { bool: { must_not: [{ match_all: {} }] } });
+  }
+
+  private listingPropertyTypeWhere(propertyTypeCode: string) {
+    const normalizedCode = propertyTypeCode.trim().toLowerCase();
+    if (normalizedCode === 'residential') return { category: { equals: 'residential', mode: 'insensitive' as const } };
+    if (normalizedCode === 'commercial') return { category: { equals: 'commercial', mode: 'insensitive' as const } };
+    if (normalizedCode === 'plot') return { name: { contains: 'plot', mode: 'insensitive' as const } };
+    return { code: { equals: normalizedCode, mode: 'insensitive' as const } };
   }
 
   private projectFilters(query: SearchProjectsQueryDto) {
@@ -247,9 +264,9 @@ export class SearchService {
       ...(query.areaId ? { areaId: query.areaId } : {}),
       ...(query.areaSlug ? { area: { slug: query.areaSlug } } : {}),
       ...(query.purposeId ? { purposeId: query.purposeId } : {}),
-      ...(this.listingPurposeSlug(query) ? { purpose: { code: this.listingPurposeSlug(query) } } : {}),
+      ...(this.listingPurposeSlug(query) ? { purpose: { slug: this.listingPurposeSlug(query) } } : {}),
       ...(query.propertyTypeId ? { propertyTypeId: query.propertyTypeId } : {}),
-      ...(query.propertyTypeCode ? { propertyType: { code: query.propertyTypeCode } } : {}),
+      ...(query.propertyTypeCode ? { propertyType: this.listingPropertyTypeWhere(query.propertyTypeCode) } : {}),
       ...(query.bedrooms !== undefined ? { bedrooms: query.bedrooms } : {}),
       ...(query.bathrooms !== undefined ? { bathrooms: query.bathrooms } : {}),
       ...(query.furnishedStatus ? { furnishedStatus: query.furnishedStatus } : {}),

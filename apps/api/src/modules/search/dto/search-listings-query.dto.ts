@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, Min } from 'class-validator';
 
 const CODE_PATTERN = /^[a-z0-9]+(?:[_-][a-z0-9]+)*$/;
@@ -14,7 +14,7 @@ export class SearchListingsQueryDto {
   @IsOptional() @IsIn(['buy', 'sale', 'rent'], { message: 'purpose must be one of buy, sale, or rent.' }) purpose?: string;
   @IsOptional() @Matches(CODE_PATTERN, { message: 'purposeSlug must be a code such as sale or rent.' }) purposeSlug?: string;
   @IsOptional() @IsUUID('4', { message: 'propertyTypeId must be a UUID. Use propertyTypeCode for codes such as house, apartment, commercial, or plot.' }) propertyTypeId?: string;
-  @IsOptional() @Matches(CODE_PATTERN, { message: 'propertyTypeCode must be a code such as house, apartment, commercial, or plot.' }) propertyTypeCode?: string;
+  @IsOptional() @Transform(({ value }) => typeof value === 'string' ? value.trim().toLowerCase() : value) @Matches(CODE_PATTERN, { message: 'propertyTypeCode must be a code such as house, apartment, commercial, or plot.' }) propertyTypeCode?: string;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) minPrice?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) maxPrice?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) minArea?: number;

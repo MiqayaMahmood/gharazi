@@ -18,6 +18,8 @@ import { SystemEventsService } from '../system-events/system-events.service';
 import { ProfessionalService } from '../professional/professional.service';
 import { AdminRoleDto, CreateAdminUserDto } from './dto/admin-users.dto';
 import { ListingContactUpdatesQueryDto, UpdateListingContactDto } from './dto/listing-contact-update.dto';
+import { AdminPromotionGrantDto } from '../promotions/dto/admin-promotion-grant.dto';
+import { AdminReconciliationQueryDto } from '../payments/dto/admin-reconciliation-query.dto';
 
 const LISTING_CONTACT_SORT_FIELDS = {
   title: 'title',
@@ -63,7 +65,25 @@ export class AdminOperationsService {
     return this.prisma.report.findMany({ where: filters, orderBy: { createdAt: 'desc' }, take: 100 });
   }
   verificationRequests() { return this.prisma.verificationRequest.findMany({ orderBy: { createdAt: 'desc' }, take: 100 }); }
-  auditLogs(limit: number) { return this.audit.list(limit); }
+  async auditLogs(limit: number) {
+    const rows = await this.audit.list(limit);
+    return rows.map((row) => ({
+      ...row,
+      metadataJson: this.safeAuditMetadata(row.action, row.metadataJson),
+    }));
+  }
+
+  private safeAuditMetadata(action: string, value: Prisma.JsonValue | null) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const source = value as Record<string, unknown>;
+    const allowedByAction: Record<string, string[]> = {
+      'promotion.admin_grant': ['listingId', 'recipientUserId', 'promotionType', 'durationDays', 'reason', 'grantedAt'],
+      'payment.reconcile': ['outcome', 'errorType'],
+      'payment.fulfillment.reconciliation_required': ['outcome', 'reasonCode'],
+    };
+    const allowed = allowedByAction[action] ?? [];
+    return Object.fromEntries(allowed.filter((key) => source[key] !== undefined).map((key) => [key, source[key]]));
+  }
 
   async analyticsSummary(input: { range?: string; from?: string; to?: string } = {}) {
     const period = this.resolveDateRange(input);
@@ -265,6 +285,7 @@ export class AdminOperationsService {
   }
 
   payments() { return this.paymentsService.listAdmin(); }
+  paymentReconciliationRequired(query: AdminReconciliationQueryDto) { return this.paymentsService.listReconciliationRequired(query); }
 
   listings(filters: { status?: string }) {
     return this.prisma.listing.findMany({
@@ -461,9 +482,24 @@ export class AdminOperationsService {
   }
 
   async reconcilePayment(actorUserId: string, id: string) {
-    const result = await this.paymentsService.reconcile(id);
-    await this.audit.record({ actorUserId, action: 'payment.reconcile', entityType: 'payment_transaction', entityId: id });
-    return result;
+    try {
+      const result = await this.paymentsService.reconcile(id);
+      await this.audit.record({ actorUserId, action: 'payment.reconcile', entityType: 'payment_transaction', entityId: id, metadataJson: { outcome: result.outcome } });
+      return result;
+    } catch (error) {
+      await this.audit.record({
+        actorUserId,
+        action: 'payment.reconcile',
+        entityType: 'payment_transaction',
+        entityId: id,
+        metadataJson: { outcome: 'failed', errorType: error instanceof Error ? error.name : 'unknown' },
+      });
+      throw error;
+    }
+  }
+
+  grantPromotion(actorUserId: string, dto: AdminPromotionGrantDto) {
+    return this.promotionsService.grantAdminPromotion(actorUserId, dto);
   }
 
   async expirePromotions(actorUserId: string) {

@@ -59,8 +59,24 @@ export function AdminTable({ columns, rows, actions }: { columns: Array<{ key: s
   if (!rows.length) return <AdminEmpty />;
 
   return (
-    <div className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
-      <div className="overflow-x-auto">
+    <div>
+      <div className="grid gap-3 md:hidden">
+        {rows.map((row, index) => (
+          <Card key={String(row.id ?? index)} className="min-w-0 p-4">
+            <dl className="grid gap-3">
+              {columns.map((column) => (
+                <div key={column.key} className="grid min-w-0 grid-cols-[minmax(5rem,0.35fr)_minmax(0,1fr)] gap-3 border-b border-line pb-3 last:border-0 last:pb-0">
+                  <dt className="text-xs font-bold uppercase tracking-wide text-muted">{column.label}</dt>
+                  <dd className="min-w-0 break-words text-sm text-ink">{column.render ? column.render(row) : String(row[column.key] ?? '-')}</dd>
+                </div>
+              ))}
+            </dl>
+            {actions ? <div className="mt-4 flex min-h-11 flex-wrap items-center gap-2 border-t border-line pt-3">{actions(row)}</div> : null}
+          </Card>
+        ))}
+      </div>
+      <div className="hidden overflow-hidden rounded-lg border border-line bg-white shadow-soft md:block">
+        <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-line text-sm">
           <thead className="bg-stone-50 text-left text-xs font-bold uppercase tracking-wide text-muted">
             <tr>
@@ -72,7 +88,7 @@ export function AdminTable({ columns, rows, actions }: { columns: Array<{ key: s
             {rows.map((row, index) => (
               <tr key={String(row.id ?? index)} className="align-top">
                 {columns.map((column) => (
-                  <td key={column.key} className="max-w-[280px] px-4 py-3 text-ink">
+                  <td key={column.key} className="max-w-[280px] break-words px-4 py-3 text-ink">
                     {column.render ? column.render(row) : String(row[column.key] ?? '-')}
                   </td>
                 ))}
@@ -81,6 +97,7 @@ export function AdminTable({ columns, rows, actions }: { columns: Array<{ key: s
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

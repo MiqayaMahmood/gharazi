@@ -95,12 +95,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-stone-50">
       <div className="border-b border-line bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:py-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-trust">Admin</p>
-            <h1 className="text-xl font-black text-ink">Gharazi Operations</h1>
+            <h1 className="text-lg font-black text-ink sm:text-xl">Gharazi Operations</h1>
           </div>
-          <Button className="lg:hidden" variant="secondary" onClick={() => setOpen(true)}>Menu</Button>
+          <Button className="shrink-0 lg:hidden" variant="secondary" onClick={() => setOpen(true)} aria-expanded={open} aria-controls="admin-navigation">Menu</Button>
         </div>
       </div>
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[270px_1fr]">
@@ -110,7 +110,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         <section className="min-w-0">{children}</section>
       </div>
       <Sheet open={open} title="Admin navigation" onClose={() => setOpen(false)}>
-        {sidebar}
+        <div id="admin-navigation">{sidebar}</div>
       </Sheet>
     </div>
   );

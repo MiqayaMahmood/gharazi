@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function InquiriesPage() {
   return (
     <div>
-      <h1 className="text-3xl font-black">Inquiries</h1>
+      <h1 className="text-2xl font-black sm:text-3xl">Inquiries</h1>
       <p className="mt-2 text-muted">Your sent and received inquiry activity.</p>
       <div className="mt-6"><Suspense><InquiriesClient /></Suspense></div>
     </div>

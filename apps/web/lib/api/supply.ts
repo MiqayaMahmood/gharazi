@@ -44,11 +44,13 @@ export type ProjectFormPayload = {
 
 export type MediaPayload = {
   id?: string;
+  clientKey?: string;
   mediaType: string;
   storageKey: string;
   url: string;
   isCover?: boolean;
   sortOrder?: number;
+  file?: File;
 };
 
 export type PresignUploadInput = {
@@ -121,7 +123,7 @@ export function getListingOwnerSummary(id: string) {
 }
 
 export function addListingMedia(id: string, payload: MediaPayload) {
-  return apiRequest(`/listings/${id}/media`, { method: 'POST', body: JSON.stringify(payload) });
+  return apiRequest<MediaPayload>(`/listings/${id}/media`, { method: 'POST', body: JSON.stringify(mediaRequestPayload(payload)) });
 }
 
 export function createProject(payload: ProjectFormPayload) {
@@ -149,7 +151,7 @@ export function getProjectOwnerSummary(id: string) {
 }
 
 export function addProjectMedia(id: string, payload: MediaPayload) {
-  return apiRequest(`/projects/${id}/media`, { method: 'POST', body: JSON.stringify(payload) });
+  return apiRequest<MediaPayload>(`/projects/${id}/media`, { method: 'POST', body: JSON.stringify(mediaRequestPayload(payload)) });
 }
 
 export function presignUpload(payload: PresignUploadInput) {
@@ -157,6 +159,13 @@ export function presignUpload(payload: PresignUploadInput) {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+function mediaRequestPayload(payload: MediaPayload) {
+  const requestPayload = { ...payload };
+  delete requestPayload.clientKey;
+  delete requestPayload.file;
+  return requestPayload;
 }
 
 export function addProjectUnit(id: string, payload: ProjectUnitPayload) {

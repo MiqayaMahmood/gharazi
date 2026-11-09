@@ -3,6 +3,21 @@ import { apiRequest, toQueryString } from './client';
 export type AdminRecord = Record<string, unknown>;
 export type AdminListResponse = AdminRecord[] | { items?: AdminRecord[]; data?: AdminRecord[]; results?: AdminRecord[] };
 
+export type AdminReconciliationPage = {
+  items: AdminRecord[];
+  nextCursor: string | null;
+  hasNextPage: boolean;
+  limit: number;
+};
+
+export type AdminPromotionGrantInput = {
+  idempotencyKey: string;
+  listingId: string;
+  promotionType: 'listing_hot' | 'listing_super_hot';
+  durationDays: 14 | 30;
+  reason: string;
+};
+
 export type AdminOverview = {
   users?: number;
   listings?: number;
@@ -143,6 +158,14 @@ export async function listAdminSubscriptions(status?: string) {
 
 export async function listAdminPayments() {
   return normalizeList(await apiRequest<AdminListResponse>('/admin/payments'));
+}
+
+export async function listAdminPaymentReconciliationRequired(input: { cursor?: string; limit?: number } = {}) {
+  return apiRequest<AdminReconciliationPage>(`/admin/payments/reconciliation-required${toQueryString(input)}`);
+}
+
+export async function grantAdminPromotion(input: AdminPromotionGrantInput) {
+  return apiRequest<AdminRecord>('/admin/promotions/grants', { method: 'POST', body: JSON.stringify(input) });
 }
 
 export async function listAdminProfessionals(status?: string) { return normalizeList(await apiRequest<AdminListResponse>(`/admin/professionals${toQueryString({ status })}`)); }

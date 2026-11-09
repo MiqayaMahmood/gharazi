@@ -24,6 +24,7 @@ export class AuditService {
 
   list(limit = 100) {
     return this.prisma.auditLog.findMany({
+      include: { actorUser: { select: { id: true, profile: { select: { fullName: true } } } } },
       orderBy: { createdAt: 'desc' },
       take: Math.min(limit, 200),
     });
