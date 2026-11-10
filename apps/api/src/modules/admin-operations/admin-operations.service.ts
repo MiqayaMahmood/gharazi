@@ -20,6 +20,8 @@ import { AdminRoleDto, CreateAdminUserDto } from './dto/admin-users.dto';
 import { ListingContactUpdatesQueryDto, UpdateListingContactDto } from './dto/listing-contact-update.dto';
 import { AdminPromotionGrantDto } from '../promotions/dto/admin-promotion-grant.dto';
 import { AdminReconciliationQueryDto } from '../payments/dto/admin-reconciliation-query.dto';
+import { AdminListingExpiryQueryDto } from './dto/admin-listing-expiry-query.dto';
+import { AdminExpirySimulationQueryDto } from './dto/admin-expiry-simulation-query.dto';
 
 const LISTING_CONTACT_SORT_FIELDS = {
   title: 'title',
@@ -299,6 +301,216 @@ export class AdminOperationsService {
       orderBy: { updatedAt: 'desc' },
       take: 200,
     });
+  }
+
+  async listingExpiryMetrics() {
+    const [row] = await this.prisma.$queryRaw<Array<{
+      totalListings: bigint | number;
+      activeListings: bigint | number;
+      approaching15Days: bigint | number;
+      approaching7Days: bigint | number;
+      approaching1Day: bigint | number;
+      overdue: bigint | number;
+      nullExpiry: bigint | number;
+      recentlyRenewed: bigint | number;
+    }>>(Prisma.sql`
+      WITH clock AS (SELECT CURRENT_TIMESTAMP AS now)
+      SELECT
+        (SELECT COUNT(*) FROM sch_gharazi.listings WHERE deleted_at IS NULL) AS "totalListings",
+        COUNT(*) FILTER (WHERE l.status = 'active' AND l.deleted_at IS NULL) AS "activeListings",
+        COUNT(*) FILTER (WHERE l.status = 'active' AND l.deleted_at IS NULL AND l.expires_at > clock.now AND l.expires_at <= clock.now + INTERVAL '15 days') AS "approaching15Days",
+        COUNT(*) FILTER (WHERE l.status = 'active' AND l.deleted_at IS NULL AND l.expires_at > clock.now AND l.expires_at <= clock.now + INTERVAL '7 days') AS "approaching7Days",
+        COUNT(*) FILTER (WHERE l.status = 'active' AND l.deleted_at IS NULL AND l.expires_at > clock.now AND l.expires_at <= clock.now + INTERVAL '1 day') AS "approaching1Day",
+        COUNT(*) FILTER (WHERE l.status = 'active' AND l.deleted_at IS NULL AND l.expires_at < clock.now) AS overdue,
+        COUNT(*) FILTER (WHERE l.status = 'active' AND l.deleted_at IS NULL AND l.expires_at IS NULL) AS "nullExpiry",
+        (SELECT COUNT(DISTINCT a.entity_id)
+          FROM sch_gharazi.audit_logs a, clock
+          WHERE a.action = 'listing.renewed' AND a.entity_type = 'listing'
+            AND a.created_at >= clock.now - INTERVAL '90 days'
+            AND a.entity_id IS NOT NULL) AS "recentlyRenewed"
+      FROM clock LEFT JOIN sch_gharazi.listings l ON TRUE
+    `);
+    const count = (value: bigint | number) => Number(value ?? 0);
+    return {
+      totalListings: count(row.totalListings),
+      activeListings: count(row.activeListings),
+      approaching15Days: count(row.approaching15Days),
+      approaching7Days: count(row.approaching7Days),
+      approaching1Day: count(row.approaching1Day),
+      overdue: count(row.overdue),
+      nullExpiry: count(row.nullExpiry),
+      recentlyRenewed: count(row.recentlyRenewed),
+      recentlyRenewedWindowDays: 90,
+    };
+  }
+
+  async listingExpiryPreview(query: AdminListingExpiryQueryDto = {}) {
+    const now = new Date();
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(Math.max(1, query.limit ?? 20), 50);
+    const where: Prisma.ListingWhereInput = { status: 'active', deletedAt: null };
+    const bucket = query.bucket ?? 'all_active';
+    if (bucket === 'overdue') where.expiresAt = { lt: now };
+    else if (bucket === 'null_expiry') where.expiresAt = null;
+    else if (bucket.startsWith('within_')) {
+      const days = bucket === 'within_1_day' ? 1 : bucket === 'within_7_days' ? 7 : 15;
+      where.expiresAt = { gt: now, lte: new Date(now.getTime() + days * 24 * 60 * 60 * 1000) };
+    }
+    const search = query.q?.trim();
+    if (search) {
+      where.AND = [{ OR: [
+        { title: { contains: search, mode: 'insensitive' } },
+        { publicId: { contains: search, mode: 'insensitive' } },
+      ] }];
+    }
+
+    const [rows, total] = await Promise.all([
+      this.prisma.listing.findMany({
+        where,
+        select: { id: true, publicId: true, title: true, ownerUserId: true, status: true, expiresAt: true },
+        orderBy: [{ expiresAt: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.listing.count({ where }),
+    ]);
+    const ids = rows.map((row) => row.id);
+    const renewals = ids.length ? await this.prisma.auditLog.groupBy({
+      by: ['entityId'],
+      where: { entityType: 'listing', action: 'listing.renewed', entityId: { in: ids } },
+      _max: { createdAt: true },
+    }) : [];
+    const lastRenewalByListing = new Map(renewals.map((item) => [item.entityId, item._max.createdAt]));
+    const cooldownMs = 90 * 24 * 60 * 60 * 1000;
+    const items = rows.map((listing) => {
+      const lastRenewalAt = lastRenewalByListing.get(listing.id) ?? null;
+      const expiry = listing.expiresAt;
+      const windowOpensAt = expiry ? new Date(expiry.getTime() - 15 * 24 * 60 * 60 * 1000) : null;
+      const cooldownEndsAt = lastRenewalAt ? new Date(lastRenewalAt.getTime() + cooldownMs) : null;
+      const renewalAvailableAt = expiry
+        ? new Date(Math.max(now.getTime(), windowOpensAt!.getTime(), cooldownEndsAt?.getTime() ?? 0))
+        : null;
+      return {
+        ...listing,
+        daysOverdue: expiry && expiry < now ? Math.ceil((now.getTime() - expiry.getTime()) / (24 * 60 * 60 * 1000)) : 0,
+        lastRenewalAt,
+        renewalEligible: Boolean(expiry && (!cooldownEndsAt || cooldownEndsAt <= now) && windowOpensAt! <= now),
+        renewalAvailableAt,
+      };
+    });
+    return { items, page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) };
+  }
+
+  async simulateListingExpiry(query: AdminExpirySimulationQueryDto) {
+    const cutoffAt = new Date(query.cutoffAt);
+    const evaluatedAt = new Date(query.evaluatedAt);
+    if (!Number.isFinite(cutoffAt.getTime()) || !Number.isFinite(evaluatedAt.getTime())) {
+      throw new BadRequestException('Simulation timestamps must be valid ISO timestamps');
+    }
+    const scenario = query.scenario;
+    const graceEndsAt = new Date(cutoffAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(Math.max(1, query.limit ?? 20), 50);
+    const overdueAtEvaluation = { lte: evaluatedAt };
+    const scenarioExpiryFilter: Prisma.DateTimeNullableFilter = scenario === 'A'
+      ? { gte: cutoffAt, ...overdueAtEvaluation }
+      : scenario === 'B' && evaluatedAt < graceEndsAt
+        ? { gte: cutoffAt, ...overdueAtEvaluation }
+        : overdueAtEvaluation;
+    const candidateWhere: Prisma.ListingWhereInput = {
+      status: 'active',
+      deletedAt: null,
+      expiresAt: scenarioExpiryFilter,
+    };
+    const search = query.q?.trim();
+    if (search) candidateWhere.AND = [{ OR: [
+      { title: { contains: search, mode: 'insensitive' } },
+      { publicId: { contains: search, mode: 'insensitive' } },
+    ] }];
+
+    const [aggregateRow] = await this.prisma.$queryRaw<Array<{
+      activeTotal: bigint | number;
+      activeWithExpiry: bigint | number;
+      overdueAtEvaluation: bigint | number;
+      historicalCohort: bigint | number;
+      candidates: bigint | number;
+      candidatesAtGraceEnd: bigint | number;
+      nullExpiry: bigint | number;
+    }>>(Prisma.sql`
+      WITH policy AS (
+        SELECT ${cutoffAt}::timestamptz AS cutoff,
+               ${evaluatedAt}::timestamptz AS evaluated_at,
+               ${scenario}::text AS scenario
+      )
+      SELECT
+        COUNT(*) FILTER (WHERE l.status = 'active' AND l.deleted_at IS NULL) AS "activeTotal",
+        COUNT(*) FILTER (WHERE l.status = 'active' AND l.deleted_at IS NULL AND l.expires_at IS NOT NULL) AS "activeWithExpiry",
+        COUNT(*) FILTER (WHERE l.status = 'active' AND l.deleted_at IS NULL AND l.expires_at <= policy.evaluated_at) AS "overdueAtEvaluation",
+        COUNT(*) FILTER (WHERE l.status = 'active' AND l.deleted_at IS NULL AND l.expires_at < policy.cutoff) AS "historicalCohort",
+        COUNT(*) FILTER (
+          WHERE l.status = 'active' AND l.deleted_at IS NULL
+            AND l.expires_at IS NOT NULL AND l.expires_at <= policy.evaluated_at
+            AND (
+              policy.scenario = 'C'
+              OR (policy.scenario = 'A' AND l.expires_at >= policy.cutoff)
+              OR (policy.scenario = 'B' AND (policy.evaluated_at >= policy.cutoff + INTERVAL '30 days' OR l.expires_at >= policy.cutoff))
+            )
+        ) AS candidates,
+        COUNT(*) FILTER (
+          WHERE policy.scenario = 'B' AND l.status = 'active' AND l.deleted_at IS NULL
+            AND l.expires_at IS NOT NULL AND l.expires_at <= policy.cutoff + INTERVAL '30 days'
+        ) AS "candidatesAtGraceEnd",
+        COUNT(*) FILTER (WHERE l.status = 'active' AND l.deleted_at IS NULL AND l.expires_at IS NULL) AS "nullExpiry"
+      FROM sch_gharazi.listings l CROSS JOIN policy
+    `);
+    const count = (value: bigint | number) => Number(value ?? 0);
+    const activeTotal = count(aggregateRow.activeTotal);
+    const scenarioCandidates = count(aggregateRow.candidates);
+    const candidatesAtGraceEnd = count(aggregateRow.candidatesAtGraceEnd);
+    const historicalCohort = count(aggregateRow.historicalCohort);
+    const historicalProtected = scenario === 'A'
+      ? historicalCohort
+      : scenario === 'B' && evaluatedAt < graceEndsAt ? historicalCohort : 0;
+
+    const [items, candidateCount] = await Promise.all([
+      this.prisma.listing.findMany({
+        where: candidateWhere,
+        select: { id: true, publicId: true, title: true, ownerUserId: true, status: true, expiresAt: true },
+        orderBy: [{ expiresAt: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.listing.count({ where: candidateWhere }),
+    ]);
+
+    return {
+      hypothetical: true,
+      scenario,
+      cutoffAt: cutoffAt.toISOString(),
+      evaluatedAt: evaluatedAt.toISOString(),
+      graceEndsAt: scenario === 'B' ? graceEndsAt.toISOString() : null,
+      activeTotal,
+      activeWithExpiry: count(aggregateRow.activeWithExpiry),
+      overdueAtEvaluation: count(aggregateRow.overdueAtEvaluation),
+      candidates: scenarioCandidates,
+      matchingCandidates: candidateCount,
+      historicalProtected,
+      notYetDue: Math.max(0, count(aggregateRow.activeWithExpiry) - count(aggregateRow.overdueAtEvaluation)),
+      nullExpiryExcluded: count(aggregateRow.nullExpiry),
+      candidatesAtGraceEnd: scenario === 'B' ? candidatesAtGraceEnd : null,
+      projectedActiveAtGraceEnd: scenario === 'B' ? Math.max(0, activeTotal - candidatesAtGraceEnd) : null,
+      projectedActiveAfterHypothetical: Math.max(0, activeTotal - scenarioCandidates),
+      page,
+      limit,
+      total: candidateCount,
+      totalPages: Math.max(1, Math.ceil(candidateCount / limit)),
+      items: items.map((listing) => ({
+        ...listing,
+        daysOverdue: listing.expiresAt
+          ? Math.max(0, Math.ceil((evaluatedAt.getTime() - listing.expiresAt.getTime()) / (24 * 60 * 60 * 1000)))
+          : 0,
+      })),
+    };
   }
 
   async listingContactUpdates(query: ListingContactUpdatesQueryDto = {}) {

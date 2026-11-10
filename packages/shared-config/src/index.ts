@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const optionalUrl = z.preprocess((value) => (value === '' ? undefined : value), z.string().url().optional());
+const optionalDateTime = z.preprocess((value) => (value === '' ? undefined : value), z.string().datetime({ offset: true }).optional());
 const envBoolean = z.preprocess((value) => {
   if (value === undefined || value === null || value === '') return false;
   if (typeof value === 'string') return value.toLowerCase() === 'true';
@@ -21,6 +22,8 @@ const envSchema = z.object({
   SEARCH_ENABLED: envBoolean.default(true),
   SEARCH_DB_FALLBACK_ENABLED: envBoolean.default(true),
   PROMOTION_ACTIVATION_ENABLED: envBoolean.default(false),
+  LISTING_EXPIRY_REMINDERS_ENABLED: envBoolean.default(false),
+  LISTING_EXPIRY_REMINDERS_BASELINE_AT: optionalDateTime,
   OTEL_ENABLED: envBoolean.default(false),
   OTEL_SERVICE_NAME: z.string().default('Gharazi-api'),
   OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl,

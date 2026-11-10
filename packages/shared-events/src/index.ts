@@ -6,6 +6,7 @@ export const QUEUES = {
   analyticsRollups: 'analytics-rollups',
   paymentFollowups: 'payment-followups',
   subscriptionAlerts: 'subscription-alerts',
+  listingExpiryReminders: 'listing-expiry-reminders',
   riskFollowups: 'risk-followups',
 } as const;
 
@@ -49,6 +50,10 @@ export type PaymentFollowupJobPayload = {
 export type SubscriptionAlertJobPayload = {
   subscriptionId?: string;
   action: 'expiry-reminder' | 'mark-expired';
+};
+
+export type ListingExpiryReminderJobPayload = {
+  action: 'generate-due';
 };
 
 export type RiskFollowupJobPayload = {

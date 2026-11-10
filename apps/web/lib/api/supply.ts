@@ -106,6 +106,21 @@ export function refreshListing(id: string) {
   return apiRequest<Listing>(`/listings/${id}/refresh`, { method: 'POST' });
 }
 
+export type ListingRenewalResult = {
+  listingId: string;
+  previousExpiresAt: string;
+  newExpiresAt: string;
+  renewalTimestamp: string;
+  replayed: boolean;
+};
+
+export function renewListing(id: string, idempotencyKey: string) {
+  return apiRequest<ListingRenewalResult>(`/listings/${id}/renew`, {
+    method: 'POST',
+    body: JSON.stringify({ idempotencyKey }),
+  });
+}
+
 export function markListingSold(id: string) {
   return apiRequest<Listing>(`/listings/${id}/mark-sold`, { method: 'POST' });
 }

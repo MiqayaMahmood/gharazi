@@ -52,6 +52,63 @@ export type ListingContactUpdatesResponse = {
 export type ListingContactSortBy = 'title' | 'contactName' | 'contactPhone' | 'contactWhatsapp' | 'createdAt' | 'updatedAt';
 export type ListingContactSortOrder = 'asc' | 'desc';
 
+export type AdminListingExpiryMetrics = {
+  totalListings: number;
+  activeListings: number;
+  approaching15Days: number;
+  approaching7Days: number;
+  approaching1Day: number;
+  overdue: number;
+  nullExpiry: number;
+  recentlyRenewed: number;
+  recentlyRenewedWindowDays: number;
+};
+
+export type AdminListingExpiryPreview = {
+  id: string;
+  publicId: string;
+  title: string;
+  ownerUserId: string;
+  status: string;
+  expiresAt: string | null;
+  daysOverdue: number;
+  lastRenewalAt: string | null;
+  renewalEligible: boolean;
+  renewalAvailableAt: string | null;
+};
+
+export type AdminListingExpiryPage = {
+  items: AdminListingExpiryPreview[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+export type AdminExpirySimulationResult = {
+  hypothetical: true;
+  scenario: 'A' | 'B' | 'C';
+  cutoffAt: string;
+  evaluatedAt: string;
+  graceEndsAt: string | null;
+  activeTotal: number;
+  activeWithExpiry: number;
+  overdueAtEvaluation: number;
+  candidates: number;
+  matchingCandidates: number;
+  historicalProtected: number;
+  notYetDue: number;
+  nullExpiryExcluded: number;
+  candidatesAtGraceEnd: number | null;
+  projectedActiveAtGraceEnd: number | null;
+  projectedActiveAfterHypothetical: number;
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  items: Array<Pick<AdminListingExpiryPreview, 'id' | 'publicId' | 'title' | 'ownerUserId' | 'status' | 'expiresAt' | 'daysOverdue'>>;
+};
+
 function normalizeList(response: AdminListResponse): AdminRecord[] {
   if (Array.isArray(response)) return response;
   return response.items ?? response.data ?? response.results ?? [];
@@ -91,6 +148,29 @@ export async function removeAdminUserRole(id: string, roleId: string) {
 
 export async function listAdminListings(status?: string) {
   return normalizeList(await apiRequest<AdminListResponse>(`/admin/listings${toQueryString({ status })}`));
+}
+
+export async function getAdminListingExpiryMetrics() {
+  return apiRequest<AdminListingExpiryMetrics>('/admin/listings/expiry/metrics');
+}
+
+export async function getAdminListingExpiryPreview(input: {
+  bucket?: 'all_active' | 'within_15_days' | 'within_7_days' | 'within_1_day' | 'overdue' | 'null_expiry';
+  page?: number;
+  limit?: number;
+  q?: string;
+}) {
+  return apiRequest<AdminListingExpiryPage>(`/admin/listings/expiry/preview${toQueryString(input)}`);
+}
+
+export async function getAdminExpirySimulation(input: {
+  scenario: 'A' | 'B' | 'C';
+  cutoffAt: string;
+  evaluatedAt: string;
+  page?: number;
+  limit?: number;
+}) {
+  return apiRequest<AdminExpirySimulationResult>(`/admin/listings/expiry/simulation${toQueryString(input)}`);
 }
 
 export async function listAdminListingContactUpdates(filters: {

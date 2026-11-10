@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
 import { BatchIdsDto } from '../../common/dto/batch-ids.dto';
 import { AddListingMediaDto } from './dto/add-listing-media.dto';
 import { CreateListingDto } from './dto/create-listing.dto';
+import { RenewListingDto } from './dto/renew-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { ListingsService } from './listings.service';
 
@@ -66,6 +67,13 @@ export class ListingsController {
   @UseGuards(JwtAuthGuard)
   refresh(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.listingsService.refresh(user, id);
+  }
+
+  @Post(':id/renew')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  renew(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: RenewListingDto) {
+    return this.listingsService.renew(user, id, dto.idempotencyKey);
   }
 
   @Post(':id/mark-sold')

@@ -1,4 +1,5 @@
 import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { AuthenticatedUser } from '@Gharazi/shared-types';
 import { makePublicId } from '@Gharazi/shared-utils';
 import { PrismaService } from '../../database/prisma.service';
@@ -9,6 +10,18 @@ import { UpdateListingDto } from './dto/update-listing.dto';
 import { buildWhatsAppUrl } from './whatsapp';
 
 const PUBLIC_LISTING_STATUSES = ['active', 'sold', 'rented'] as const;
+const RENEWAL_DAYS = 90;
+const RENEWAL_WINDOW_DAYS = 15;
+const RENEWAL_COOLDOWN_MS = RENEWAL_DAYS * 24 * 60 * 60 * 1000;
+const RENEWAL_WINDOW_MS = RENEWAL_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+export type ListingRenewalResult = {
+  listingId: string;
+  previousExpiresAt: string;
+  newExpiresAt: string;
+  renewalTimestamp: string;
+  replayed: boolean;
+};
 
 @Injectable()
 export class ListingsService {
@@ -53,14 +66,46 @@ export class ListingsService {
     }
   }
 
-  listMine(userId: string) {
-    return this.prisma.listing.findMany({
+  async listMine(userId: string) {
+    const listings = await this.prisma.listing.findMany({
       where: {
         deletedAt: null,
         OR: [{ ownerUserId: userId }, { managedByUserId: userId }],
       },
       include: this.detailInclude(),
       orderBy: { updatedAt: 'desc' },
+    });
+    if (listings.length === 0) return listings;
+
+    const now = new Date();
+    const recentRenewals = await this.prisma.auditLog.groupBy({
+      by: ['entityId'],
+      where: {
+        action: 'listing.renewed',
+        entityType: 'listing',
+        entityId: { in: listings.map((listing) => listing.id) },
+        createdAt: { gt: new Date(now.getTime() - RENEWAL_COOLDOWN_MS) },
+      },
+      _max: { createdAt: true },
+    });
+    const renewedAtByListing = new Map(
+      recentRenewals.flatMap((row) => row.entityId && row._max.createdAt ? [[row.entityId, row._max.createdAt] as const] : []),
+    );
+
+    return listings.map((listing) => {
+      const expiry = listing.expiresAt;
+      if (listing.status !== 'active' || !(expiry instanceof Date) || !Number.isFinite(expiry.getTime())) {
+        return { ...listing, renewalEligible: false, renewalAvailableAt: null };
+      }
+      const earliestByExpiry = Math.max(now.getTime(), expiry.getTime() - RENEWAL_WINDOW_MS);
+      const lastRenewal = renewedAtByListing.get(listing.id);
+      const earliestByCooldown = lastRenewal ? lastRenewal.getTime() + RENEWAL_COOLDOWN_MS : now.getTime();
+      const renewalAvailableAt = new Date(Math.max(earliestByExpiry, earliestByCooldown));
+      return {
+        ...listing,
+        renewalEligible: renewalAvailableAt.getTime() <= now.getTime(),
+        renewalAvailableAt,
+      };
     });
   }
 
@@ -220,6 +265,129 @@ export class ListingsService {
     }
 
     return updated;
+  }
+
+  async renew(user: AuthenticatedUser, id: string, idempotencyKey: string): Promise<ListingRenewalResult> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const listing = await tx.listing.findFirst({
+          where: {
+            OR: [{ id }, { publicId: id }],
+            deletedAt: null,
+            AND: [{ OR: [{ ownerUserId: user.id }, { managedByUserId: user.id }] }],
+          },
+          select: {
+            id: true,
+            ownerUserId: true,
+            managedByUserId: true,
+            status: true,
+            expiresAt: true,
+            updatedAt: true,
+          },
+        });
+
+        if (!listing) throw new ForbiddenException('Listing is not available for renewal by this account');
+
+        const replay = await this.findRenewalAudit(tx.auditLog, user.id, listing.id, idempotencyKey);
+        if (replay) return replay;
+
+        if (listing.status !== 'active') {
+          throw new ConflictException(`A listing in ${listing.status} status cannot be renewed`);
+        }
+        if (!(listing.expiresAt instanceof Date) || !Number.isFinite(listing.expiresAt.getTime())) {
+          throw new ConflictException('A listing without a valid expiry date cannot be renewed');
+        }
+
+        const [{ now }] = await tx.$queryRaw<Array<{ now: Date }>>`SELECT CURRENT_TIMESTAMP AS now`;
+        if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
+          throw new Error('Database renewal timestamp is unavailable');
+        }
+
+        const earliestRenewal = listing.expiresAt.getTime() - RENEWAL_WINDOW_MS;
+        if (now.getTime() < earliestRenewal) {
+          throw new ConflictException('Renewal is available only during the 15 days before expiry or after expiry');
+        }
+
+        const cooldownBoundary = new Date(now.getTime() - RENEWAL_COOLDOWN_MS);
+        const recentRenewal = await tx.auditLog.findFirst({
+          where: {
+            action: 'listing.renewed',
+            entityType: 'listing',
+            entityId: listing.id,
+            createdAt: { gt: cooldownBoundary },
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        });
+        if (recentRenewal) {
+          const renewalAvailableAt = new Date(recentRenewal.createdAt.getTime() + RENEWAL_COOLDOWN_MS);
+          throw new ConflictException(`This listing was renewed recently; try again after ${renewalAvailableAt.toISOString()}`);
+        }
+
+        const newExpiresAt = new Date(Math.max(listing.expiresAt.getTime(), now.getTime()) + RENEWAL_COOLDOWN_MS);
+        const updated = await tx.listing.updateMany({
+          where: {
+            id: listing.id,
+            ownerUserId: listing.ownerUserId,
+            managedByUserId: listing.managedByUserId,
+            status: 'active',
+            deletedAt: null,
+            expiresAt: listing.expiresAt,
+            AND: [{ OR: [{ ownerUserId: user.id }, { managedByUserId: user.id }] }],
+          },
+          // Preserve updatedAt so renewal does not alter PostgreSQL fallback sort behavior.
+          data: { expiresAt: newExpiresAt, updatedAt: listing.updatedAt },
+        });
+        if (updated.count !== 1) {
+          throw new ConflictException('Listing changed during renewal; retry with the same idempotency key');
+        }
+
+        const metadata = {
+          idempotencyKey,
+          previousExpiresAt: listing.expiresAt.toISOString(),
+          newExpiresAt: newExpiresAt.toISOString(),
+          renewalTimestamp: now.toISOString(),
+          renewalSource: 'seller_dashboard',
+          durationDays: RENEWAL_DAYS,
+        };
+        await tx.auditLog.create({
+          data: {
+            actorUserId: user.id,
+            action: 'listing.renewed',
+            entityType: 'listing',
+            entityId: listing.id,
+            metadataJson: metadata as Prisma.InputJsonValue,
+            createdAt: now,
+          },
+        });
+
+        return {
+          listingId: listing.id,
+          previousExpiresAt: metadata.previousExpiresAt,
+          newExpiresAt: metadata.newExpiresAt,
+          renewalTimestamp: metadata.renewalTimestamp,
+          replayed: false,
+        };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      // A competing request with the same key may have committed while this transaction lost its CAS.
+      const authorizedListing = await this.prisma.listing.findFirst({
+        where: {
+          OR: [{ id }, { publicId: id }],
+          deletedAt: null,
+          AND: [{ OR: [{ ownerUserId: user.id }, { managedByUserId: user.id }] }],
+        },
+        select: { id: true },
+      });
+      if (authorizedListing) {
+        const replay = await this.findRenewalAudit(this.prisma.auditLog, user.id, authorizedListing.id, idempotencyKey);
+        if (replay) return replay;
+      }
+      if (this.isSerializationFailure(error)) {
+        throw new ConflictException('A concurrent renewal changed this listing; retry with the same idempotency key');
+      }
+      throw error;
+    }
   }
 
   async markStatus(user: AuthenticatedUser, id: string, status: 'sold' | 'rented') {
@@ -382,6 +550,46 @@ export class ListingsService {
 
   private isRecordNotFound(error: unknown): boolean {
     return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2025';
+  }
+
+  private async findRenewalAudit(
+    auditLog: Prisma.TransactionClient['auditLog'],
+    actorUserId: string,
+    listingId: string,
+    idempotencyKey: string,
+  ): Promise<ListingRenewalResult | null> {
+    const audit = await auditLog.findFirst({
+      where: {
+        actorUserId,
+        action: 'listing.renewed',
+        entityType: 'listing',
+        entityId: listingId,
+        metadataJson: { path: ['idempotencyKey'], equals: idempotencyKey },
+      },
+      select: { metadataJson: true },
+    });
+    const metadata = audit?.metadataJson as Record<string, unknown> | null | undefined;
+    if (!metadata) return null;
+    if (
+      typeof metadata.previousExpiresAt !== 'string' ||
+      typeof metadata.newExpiresAt !== 'string' ||
+      typeof metadata.renewalTimestamp !== 'string' ||
+      metadata.renewalSource !== 'seller_dashboard' ||
+      metadata.durationDays !== RENEWAL_DAYS
+    ) {
+      throw new ConflictException('Idempotency key matches an incompatible renewal record');
+    }
+    return {
+      listingId,
+      previousExpiresAt: metadata.previousExpiresAt,
+      newExpiresAt: metadata.newExpiresAt,
+      renewalTimestamp: metadata.renewalTimestamp,
+      replayed: true,
+    };
+  }
+
+  private isSerializationFailure(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2034';
   }
 
   private async uniquePublicId(): Promise<string> {

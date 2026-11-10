@@ -468,6 +468,7 @@ model SavedSearch {
 model Notification {
   id               String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId           String                 @map("user_id") @db.Uuid
+  deduplicationKey String?                @unique @map("deduplication_key") @db.VarChar(255)
   notificationType String                 @map("notification_type") @db.VarChar(64)
   title            String                 @db.VarChar(180)
   body             String?                @db.VarChar(1000)

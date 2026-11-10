@@ -14,6 +14,8 @@ import { AdminRoleDto, CreateAdminUserDto } from './dto/admin-users.dto';
 import { ListingContactUpdatesQueryDto, UpdateListingContactDto } from './dto/listing-contact-update.dto';
 import { AdminPromotionGrantDto } from '../promotions/dto/admin-promotion-grant.dto';
 import { AdminReconciliationQueryDto } from '../payments/dto/admin-reconciliation-query.dto';
+import { AdminListingExpiryQueryDto } from './dto/admin-listing-expiry-query.dto';
+import { AdminExpirySimulationQueryDto } from './dto/admin-expiry-simulation-query.dto';
 import { AdminOperationsService } from './admin-operations.service';
 
 @ApiTags('admin')
@@ -38,6 +40,13 @@ export class AdminOperationsController {
     return this.admin.paymentReconciliationRequired(query);
   }
   @Get('listings') listings(@Query('status') status?: string) { return this.admin.listings({ status }); }
+  @Get('listings/expiry/metrics') listingExpiryMetrics() { return this.admin.listingExpiryMetrics(); }
+  @Get('listings/expiry/preview') listingExpiryPreview(@Query() query: AdminListingExpiryQueryDto) {
+    return this.admin.listingExpiryPreview(query);
+  }
+  @Get('listings/expiry/simulation') listingExpirySimulation(@Query() query: AdminExpirySimulationQueryDto) {
+    return this.admin.simulateListingExpiry(query);
+  }
   @Get('listing-contact-updates')
   @RequireRoles('admin')
   listingContactUpdates(@Query() query: ListingContactUpdatesQueryDto) {

@@ -57,6 +57,9 @@ export type Listing = {
   isHot?: boolean;
   updatedAt?: string;
   publishedAt?: string;
+  expiresAt?: string | null;
+  renewalEligible?: boolean;
+  renewalAvailableAt?: string | null;
   amenities?: Amenity[];
   listerName?: string;
   listerRole?: string;

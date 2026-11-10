@@ -2,32 +2,58 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Badge, InfoChip } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState, ErrorState, Skeleton } from '@/components/ui/state';
 import { useMyListings, useMyProjects } from '@/lib/query/hooks';
 import { formatDate, formatPrice } from '@/lib/utils';
-import { archiveListing, archiveProject, markListingRented, markListingSold, refreshListing } from '@/lib/api/supply';
+import { archiveListing, archiveProject, markListingRented, markListingSold, refreshListing, renewListing, type ListingRenewalResult } from '@/lib/api/supply';
 import { getUserFriendlyErrorMessage } from '@/lib/api/mock-fallback';
 import { getDashboardListingEditHref, getDashboardProjectEditHref, getListingHref, getProjectHref } from '@/lib/routes';
 import { CheckoutButton } from '@/components/payments/checkout-button';
+import type { Listing } from '@/types/marketplace';
+
+type ListingAction =
+  | { id: string; type: 'archive' | 'sold' | 'rented' | 'refresh' }
+  | { id: string; type: 'renew'; idempotencyKey: string };
 
 export function MyListingsClient() {
   const queryClient = useQueryClient();
   const [errorText, setErrorText] = useState('');
+  const [successText, setSuccessText] = useState('');
+  const [renewalKeys, setRenewalKeys] = useState<Record<string, string>>({});
+  const renewalKeyRef = useRef<Record<string, string>>({});
+  const pendingRenewals = useRef(new Set<string>());
   const [statusFilter, setStatusFilter] = useState('all');
   const { data = [], isLoading, isError } = useMyListings();
-  const action = useMutation({
-    mutationFn: ({ id, type }: { id: string; type: 'archive' | 'sold' | 'rented' | 'refresh' }) => {
+  const action = useMutation<Listing | ListingRenewalResult, Error, ListingAction>({
+    mutationFn: (variables) => {
       setErrorText('');
-      if (type === 'archive') return archiveListing(id);
-      if (type === 'sold') return markListingSold(id);
-      if (type === 'rented') return markListingRented(id);
-      return refreshListing(id);
+      setSuccessText('');
+      if (variables.type === 'archive') return archiveListing(variables.id);
+      if (variables.type === 'sold') return markListingSold(variables.id);
+      if (variables.type === 'rented') return markListingRented(variables.id);
+      if (variables.type === 'renew') return renewListing(variables.id, variables.idempotencyKey);
+      return refreshListing(variables.id);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-listings'] }),
+    onSuccess: (_result, variables) => {
+      setErrorText('');
+      if (variables.type === 'renew') {
+        setSuccessText('Listing renewed for 90 days.');
+        delete renewalKeyRef.current[variables.id];
+        setRenewalKeys((current) => {
+          const next = { ...current };
+          delete next[variables.id];
+          return next;
+        });
+      }
+      return queryClient.invalidateQueries({ queryKey: ['my-listings'] });
+    },
+    onSettled: (_result, _error, variables) => {
+      if (variables.type === 'renew') pendingRenewals.current.delete(variables.id);
+    },
     onError: (error) => setErrorText(getUserFriendlyErrorMessage(error)),
   });
   if (isLoading) return <Skeleton className="h-80" />;
@@ -36,6 +62,16 @@ export function MyListingsClient() {
 
   const statuses = Array.from(new Set(data.map((listing) => listing.status).filter((status): status is string => Boolean(status))));
   const visibleListings = statusFilter === 'all' ? data : data.filter((listing) => listing.status === statusFilter);
+
+  function requestRenewal(listing: (typeof data)[number]) {
+    if (pendingRenewals.current.has(listing.id)) return;
+    if (!window.confirm(`Renew “${listing.title}” for 90 days? This renewal is free.`)) return;
+    const idempotencyKey = renewalKeyRef.current[listing.id] ?? globalThis.crypto.randomUUID();
+    pendingRenewals.current.add(listing.id);
+    renewalKeyRef.current[listing.id] = idempotencyKey;
+    setRenewalKeys((current) => ({ ...current, [listing.id]: idempotencyKey }));
+    action.mutate({ id: listing.id, type: 'renew', idempotencyKey });
+  }
 
   return (
     <div className="grid gap-4">
@@ -48,6 +84,7 @@ export function MyListingsClient() {
         ))}
       </div>
       {errorText ? <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{errorText}</p> : null}
+      {successText ? <p role="status" className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{successText}</p> : null}
       {visibleListings.map((listing) => (
         <Card key={listing.id} className="p-4 sm:p-5">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
@@ -55,7 +92,22 @@ export function MyListingsClient() {
               <div className="flex flex-wrap gap-2"><Badge>{listingStatusLabel(listing.status)}</Badge>{listing.verificationStatus ? <InfoChip>{listing.verificationStatus}</InfoChip> : null}</div>
               <h2 className="mt-3 text-lg font-black">{listing.title}</h2>
               <p className="mt-1 text-sm text-muted">{listing.areaName}, {listing.cityName} · {formatPrice(listing.priceAmount)}</p>
-              <div className="mt-3 flex flex-wrap gap-2"><InfoChip>Updated {formatDate(listing.updatedAt)}</InfoChip><InfoChip>{listing.publicId}</InfoChip></div>
+              <div className="mt-3 flex flex-wrap gap-2"><InfoChip>Updated {formatDate(listing.updatedAt)}</InfoChip><InfoChip>{listing.publicId}</InfoChip><InfoChip>Expires {listing.expiresAt ? formatDate(listing.expiresAt) : 'Not set'}</InfoChip></div>
+              {listing.status === 'active' ? (
+                <div className="mt-3 grid justify-items-start gap-2">
+                  {listing.renewalEligible ? (
+                    <Button type="button" disabled={action.isPending} onClick={() => requestRenewal(listing)}>
+                      {renewalKeys[listing.id] ? 'Retry renewal' : 'Renew for 90 days'}
+                    </Button>
+                  ) : listing.renewalAvailableAt ? (
+                    <p className="text-sm text-muted">Renewal available from {formatDate(listing.renewalAvailableAt)}.</p>
+                  ) : (
+                    <p className="text-sm text-muted">Renewal unavailable because this listing has no expiry date.</p>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-muted">Renewal is available for active listings only.</p>
+              )}
             </div>
             <div className="grid gap-2 sm:min-w-64">
               <div className="grid grid-cols-2 gap-2"><Button asChild href={getDashboardListingEditHref(listing.id)}>Edit listing</Button><Button asChild href={getListingHref(listing)} variant="secondary">Preview</Button></div>

@@ -4,6 +4,7 @@ describe('getNotificationDestination', () => {
   it.each([
     [{ chatId: 'chat 1' }, '/dashboard/chats?chatId=chat%201'],
     [{ inquiryId: 'inq-1' }, '/dashboard/inquiries?inquiryId=inq-1'],
+    [{ listingId: 'listing-1', action: 'renew_listing' }, '/dashboard/listings'],
     [{ listingId: 'listing-1' }, '/dashboard/listings/listing-1/edit'],
     [{ projectId: 'project-1' }, '/dashboard/projects/project-1/edit'],
     [{ professionalProfileId: 'profile-1' }, '/dashboard/professional/profile'],

@@ -18,6 +18,10 @@ import { PrismaClient } from '@prisma/client';
 import { PROMOTION_LIFECYCLE_PRISMA } from './jobs/promotions/promotion-lifecycle.constants';
 import { PromotionActivationDeliveryService } from './jobs/promotions/promotion-activation-delivery.service';
 import { PromotionLifecycleService } from './jobs/promotions/promotion-lifecycle.service';
+import { ListingExpiryRemindersProcessor } from './jobs/listing-expiry-reminders/listing-expiry-reminders.processor';
+import { ListingExpiryRemindersService } from './jobs/listing-expiry-reminders/listing-expiry-reminders.service';
+import { PrismaService } from '../../api/src/database/prisma.service';
+import { NotificationsService } from '../../api/src/modules/notifications/notifications.service';
 
 const logger = new Logger('WorkerModule');
 
@@ -55,6 +59,10 @@ const logger = new Logger('WorkerModule');
   ],
   providers: [
     NotificationsProcessor,
+    ListingExpiryRemindersProcessor,
+    ListingExpiryRemindersService,
+    PrismaService,
+    NotificationsService,
     SearchIndexingProcessor,
     SearchDocumentBuilder,
     SavedSearchAlertsProcessor,

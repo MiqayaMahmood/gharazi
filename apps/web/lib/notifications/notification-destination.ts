@@ -8,6 +8,7 @@ export function getNotificationDestination(payload: NotificationPayload): string
   if (inquiryId) return `/dashboard/inquiries?inquiryId=${encodeURIComponent(inquiryId)}`;
 
   const listingId = identifier(payload?.listingId);
+  if (listingId && payload?.action === 'renew_listing') return '/dashboard/listings';
   if (listingId) return `/dashboard/listings/${encodeURIComponent(listingId)}/edit`;
 
   const projectId = identifier(payload?.projectId);
